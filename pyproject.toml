@@ -1,0 +1,26 @@
+[project]
+name = "fitgen"
+version = "0.1.0"
+description = "Fit Test Builder geometry: printable slip-fit test coupons (build123d)"
+requires-python = ">=3.10"
+dependencies = ["build123d>=0.9"]
+
+[project.optional-dependencies]
+server = ["fastapi>=0.110", "uvicorn>=0.29", "trimesh>=4.0", "numpy"]
+test = ["pytest", "httpx"]
+
+[project.scripts]
+fitgen = "fitgen.cli:main"
+
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["fitgen"]
+
+[tool.setuptools.package-data]
+fitgen = ["fonts/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

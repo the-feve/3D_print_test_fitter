@@ -1,0 +1,575 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111113" media="(prefers-color-scheme: dark)">
+<meta name="robots" content="noindex">
+<title>Fit Test Builder · Quiver Design Works</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect x=%271%27 y=%277%27 width=%2714%27 height=%278%27 rx=%271.5%27 fill=%27%236e6e73%27/%3E%3Crect x=%275%27 y=%271%27 width=%276%27 height=%2710%27 rx=%271%27 fill=%27%230a58ca%27/%3E%3C/svg%3E">
+<style>
+  /* Palette and layout match Rocket Builder (and fevergeon.com / quiverdesignworks.net):
+     neutral greys, one blue accent, inverted "ink on paper" primary button.
+     Follows the system light/dark setting; the header button overrides it. */
+  :root {
+    color-scheme: light;
+    --bg:#fff; --panel:#fff; --card:#f5f5f7; --ink:#1d1d1f; --muted:#6e6e73; --line:#e5e5ea; --rowline:#efeff2;
+    --field:#fff; --accent:#0a58ca; --accent-ink:#fff; --err:#d70015; --errbg:#fff2f3; --errline:#f5c2c7;
+    --view-top:#f5f5f7; --view-bot:#e9e9ee; --chip:rgba(255,255,255,.88); --ok:#1a7f37; --warn:#9a6700;
+    --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+    --safe-l:env(safe-area-inset-left,0px); --safe-r:env(safe-area-inset-right,0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme=light]) {
+      color-scheme: dark;
+      --bg:#111113; --panel:#111113; --card:#1c1c1f; --ink:#f2f2f4; --muted:#a1a1a6; --line:#2c2c30; --rowline:#222226;
+      --field:#1c1c1f; --accent:#6ea8fe; --accent-ink:#111113; --err:#ff8a80; --errbg:#2e1416; --errline:#5c2a2c;
+      --view-top:#1c1c1f; --view-bot:#0b0b0d; --chip:rgba(28,28,31,.88); --ok:#56d364; --warn:#e3b341;
+    }
+  }
+  :root[data-theme=dark] {
+    color-scheme: dark;
+    --bg:#111113; --panel:#111113; --card:#1c1c1f; --ink:#f2f2f4; --muted:#a1a1a6; --line:#2c2c30; --rowline:#222226;
+    --field:#1c1c1f; --accent:#6ea8fe; --accent-ink:#111113; --err:#ff8a80; --errbg:#2e1416; --errline:#5c2a2c;
+    --view-top:#1c1c1f; --view-bot:#0b0b0d; --chip:rgba(28,28,31,.88); --ok:#56d364; --warn:#e3b341;
+  }
+  * { box-sizing:border-box; }
+  html { -webkit-text-size-adjust:100%; text-size-adjust:100%; }
+  body { margin:0; font:14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--ink); background:var(--bg);
+    -webkit-tap-highlight-color:transparent; display:flex; flex-direction:column; height:100vh; height:100dvh; }
+  a { color:var(--accent); }
+  header { flex:none; display:flex; align-items:center; flex-wrap:wrap; gap:6px 18px; min-height:52px;
+    padding:calc(8px + var(--safe-t)) calc(16px + var(--safe-r)) 8px calc(16px + var(--safe-l));
+    border-bottom:1px solid var(--line); background:var(--panel); }
+  header h1 { font-size:1.15rem; font-weight:700; letter-spacing:.02em; margin:0; }
+  header nav { display:flex; gap:18px; align-items:center; font-size:14px; }
+  header nav a { color:var(--ink); text-decoration:none; }
+  header nav a:hover { text-decoration:underline; text-underline-offset:5px; }
+  header .units { color:var(--muted); font-size:12px; }
+  #theme { margin-left:auto; flex:none; padding:5px 12px; font:500 12px system-ui, -apple-system, sans-serif; color:var(--muted);
+    background:transparent; border:1px solid var(--line); border-radius:6px; cursor:pointer; }
+  #theme:hover { color:var(--ink); border-color:var(--muted); }
+  main { flex:1 1 auto; min-height:0; display:grid; grid-template-columns:330px minmax(0,1fr); }
+  #form { overflow-y:auto; -webkit-overflow-scrolling:touch; padding:8px 14px 16px calc(14px + var(--safe-l)); background:var(--panel); border-right:1px solid var(--line); }
+  fieldset { border:none; border-top:1px solid var(--line); margin:10px 0 0; padding:8px 0 0; min-width:0; }
+  legend { font-weight:600; font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); padding:0 6px 0 0; }
+  label { display:grid; grid-template-columns:1fr 120px; align-items:center; gap:8px; margin:6px 0; }
+  label.check { grid-template-columns:1fr auto; }
+  label.wide { grid-template-columns:1fr; gap:3px; }
+  input[type=number], input[type=text], select { width:100%; padding:5px 7px; border:1px solid var(--line); border-radius:6px; font:inherit; color:var(--ink); background:var(--field); }
+  input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+  input:disabled { opacity:.5; }
+  input[type=checkbox], input[type=radio] { accent-color:var(--accent); width:16px; height:16px; margin:0; }
+  .hint { color:var(--muted); font-size:11.5px; margin:-2px 0 4px; }
+  .row3 { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+  .row3 label { grid-template-columns:1fr; gap:2px; margin:2px 0; font-size:12px; color:var(--muted); }
+  .seg { display:flex; margin:6px 0 2px; border:1px solid var(--line); border-radius:6px; overflow:hidden; }
+  .seg button { flex:1; padding:5px 8px; border:0; border-radius:0; font:600 12px system-ui; color:var(--muted); background:transparent; cursor:pointer; }
+  .seg button[aria-pressed=true] { color:var(--accent-ink); background:var(--accent); }
+  [hidden] { display:none !important; }
+  .actions { position:sticky; bottom:-16px; background:var(--panel); padding:10px 0 6px; display:flex; flex-wrap:wrap; gap:8px; border-top:1px solid var(--line); margin-top:12px; }
+  button, a.btn { flex:1; padding:9px 12px; border-radius:6px; border:1px solid transparent; font:600 14px system-ui, -apple-system, sans-serif; cursor:pointer; text-align:center; text-decoration:none; }
+  #build { flex:1 1 100%; background:var(--ink); color:var(--bg); }
+  #build:hover { opacity:.88; }
+  #build:disabled { opacity:.5; cursor:wait; }
+  a.btn { color:var(--ink); background:transparent; border-color:var(--line); }
+  a.btn:hover { border-color:var(--accent); color:var(--accent); }
+  a.btn.off { pointer-events:none; opacity:.4; }
+  #right { display:grid; grid-template-rows:minmax(0,1fr) auto; min-width:0; min-height:0; }
+  #view { position:relative; min-height:0; min-width:0; overflow:hidden; background:linear-gradient(var(--view-top),var(--view-bot));
+    -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+  #view canvas { position:absolute; inset:0; width:100% !important; height:100% !important; display:block; touch-action:none; }
+  .chip { background:var(--chip); border:1px solid var(--line); border-radius:6px; font-size:12px;
+    -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
+  #status { position:absolute; z-index:1; left:12px; top:10px; max-width:calc(100% - 250px); padding:4px 8px; color:var(--muted); }
+  #viewopts { position:absolute; z-index:1; right:12px; top:10px; display:flex; gap:12px; padding:4px 10px; }
+  #viewopts label { display:flex; margin:0; gap:5px; align-items:center; }
+  #tip { position:absolute; z-index:2; pointer-events:none; padding:4px 8px; color:var(--ink); white-space:nowrap; }
+  #tip b { font-weight:600; }
+  #progress { position:absolute; z-index:2; left:0; right:0; top:0; height:3px; }
+  #progress div { height:100%; width:0; background:var(--accent); transition:width .3s; }
+  #report { padding:10px 16px calc(10px + var(--safe-b)) 16px; padding-right:calc(16px + var(--safe-r)); background:var(--panel); border-top:1px solid var(--line);
+    max-height:34vh; max-height:34dvh; overflow-y:auto; -webkit-overflow-scrolling:touch; display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); gap:6px 24px; }
+  #report:empty { display:none; }
+  #report h2 { font-size:13px; margin:6px 0 4px; }
+  table { border-collapse:collapse; width:100%; font-size:12.5px; }
+  td, th { padding:3px 6px 3px 0; text-align:left; border-bottom:1px solid var(--rowline); }
+  th { color:var(--muted); font-weight:600; }
+  td.n, th.n { text-align:right; font-variant-numeric:tabular-nums; }
+  tr.hi td { background:var(--card); }
+  .sw { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; vertical-align:-1px; }
+  ul { margin:4px 0; padding-left:18px; }
+  .error { grid-column:1/-1; color:var(--err); background:var(--errbg); border:1px solid var(--errline); padding:8px 10px; border-radius:6px; }
+  .warn { color:var(--warn); }
+  .ok { color:var(--ok); }
+  dl.guide { margin:4px 0; font-size:12.5px; }
+  dl.guide dt { font-weight:600; } dl.guide dd { margin:0 0 4px; color:var(--muted); }
+  @media (max-width: 760px) {
+    body { height:auto; }
+    main { display:flex; flex-direction:column; }
+    #form { border-right:none; overflow:visible; }
+    #right { order:-1; grid-template-rows:60vh auto; }
+    #report { max-height:none; grid-template-columns:1fr; }
+    #status { max-width:calc(100% - 24px); top:46px; }
+  }
+</style>
+<script>
+  // Follows the system theme (like Rocket Builder); the header button pins light or dark in this browser.
+  try { const t = localStorage.getItem('theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}
+</script>
+<script type="importmap">
+{ "imports": {
+  "three": "/static/vendor/three/build/three.module.js",
+  "three/addons/": "/static/vendor/three/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<header><h1>Fit Test Builder</h1><nav><a href="https://quiverdesignworks.net/">← Quiver Design Works</a></nav><span class="units">Beta · units mm · clearances radial (per side)</span><button id="theme" type="button"></button></header>
+<main>
+  <form id="form" autocomplete="off" novalidate>
+    <fieldset>
+      <legend>Shape</legend>
+      <label class="wide">Coupon <select id="shape">
+        <option value="round">Round peg / hole</option>
+        <option value="square">Square peg / hole</option>
+        <option value="tube">Tube shoulder / socket</option>
+      </select></label>
+      <p class="hint" id="shapehint"></p>
+      <label class="wide"><span id="sizelabel">Sizes, mm</span><input type="text" id="sizes" inputmode="decimal"></label>
+      <p class="hint">One socket per size. Separate several with commas, e.g. 13, 18, 24.</p>
+    </fieldset>
+    <fieldset>
+      <legend>Clearance (radial, per side)</legend>
+      <div class="seg" role="group" aria-label="Clearance input">
+        <button type="button" id="cmode-range" aria-pressed="true">Range</button>
+        <button type="button" id="cmode-list" aria-pressed="false">List</button>
+      </div>
+      <div class="row3" id="crange">
+        <label>Start, mm<input type="number" id="cstart" step="0.01" min="0" max="1.5" value="0.05"></label>
+        <label>Step, mm<input type="number" id="cstep" step="0.01" min="0.001" max="1" value="0.05"></label>
+        <label>Count<input type="number" id="ccount" step="1" min="1" max="20" value="6"></label>
+      </div>
+      <label class="wide" id="clist" hidden><span>Clearances, mm</span><input type="text" id="clearances" inputmode="decimal" value="0.1, 0.15, 0.18, 0.2"></label>
+      <p class="hint" id="chint"></p>
+    </fieldset>
+    <fieldset>
+      <legend>Peg</legend>
+      <label class="wide"><span>Engagement lengths, mm</span><input type="text" id="lengths" inputmode="decimal"></label>
+      <p class="hint">A shorter peg feels looser at the same clearance. Give two or three lengths to test that too.</p>
+      <label><span id="walllabel">Wall, mm</span><input type="number" id="wall" step="0.1" min="0.8" max="10"></label>
+      <label class="tube-only">Seat <select id="seat"><option value="countersink">45° countersink</option><option value="flat">Flat stop</option></select></label>
+      <label class="square-only">Socket corner radius, mm<input type="number" id="corner" step="0.1" min="0" value="1.0"></label>
+      <p class="hint square-only">Sharp inside corners print tight; the peg's corners follow the socket's, offset by the clearance.</p>
+      <label class="check">Chamfer the peg's insertion end <input type="checkbox" id="chamferon" checked></label>
+      <label>Chamfer size, mm<input type="number" id="chamfer" step="0.1" min="0.1" max="2" value="0.5"></label>
+      <p class="hint">45°. Takes off the elephant foot when the peg prints that end down, and gives a lead-in.</p>
+      <label class="check not-tube">Vent hole in the socket floor <input type="checkbox" id="vent" checked></label>
+    </fieldset>
+    <fieldset>
+      <legend>Printing</legend>
+      <label>Orientation <select id="orientation">
+        <option value="flat">Flat face down</option>
+        <option value="functional">Insertion end down</option>
+      </select></label>
+      <p class="hint" id="orienthint"></p>
+      <label>Printer <select id="printer"></select></label>
+      <label>Plate size, mm<input type="number" id="plate" step="1" min="60" max="500" value="256"></label>
+    </fieldset>
+    <div class="actions">
+      <button id="build" type="submit">Build</button>
+      <a id="dl3mf" class="btn off" href="#" download>3MF plate</a>
+      <a id="dlzip" class="btn off" href="#" download>STLs (ZIP)</a>
+    </div>
+  </form>
+  <section id="right">
+    <div id="view">
+      <div id="progress" hidden><div></div></div>
+      <div id="status" class="chip">Set the options and press Build.</div>
+      <div id="viewopts" class="chip">
+        <label><input type="checkbox" id="assembled"> Assembled</label>
+        <label><input type="checkbox" id="section"> Section</label>
+      </div>
+      <div id="tip" class="chip" hidden></div>
+    </div>
+    <div id="report"></div>
+  </section>
+</main>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const $ = id => document.getElementById(id);
+const SHAPE_TEXT = {
+  round: { hint: 'A solid round peg with a head (the stop) in a blind round socket.', size: 'Hole diameters, mm', wall: 'Socket wall, mm' },
+  square: { hint: 'A square peg with a head in a blind square socket.', size: 'Hole sides, mm', wall: 'Socket wall, mm' },
+  tube: { hint: 'A hollow shoulder into a tube bore, like a rocket body joint, seated on a countersink or a flat stop.', size: 'Tube bores (ID), mm', wall: 'Tube wall, mm' },
+};
+let options = null;
+
+// ---------- form ----------
+const nums = s => s.split(/[,;\s]+/).map(x => x.trim()).filter(Boolean).map(Number);
+let cmode = 'range';
+function setCmode(m) {
+  cmode = m;
+  $('cmode-range').setAttribute('aria-pressed', m === 'range');
+  $('cmode-list').setAttribute('aria-pressed', m === 'list');
+  $('crange').hidden = m !== 'range'; $('clist').hidden = m !== 'list';
+  clearanceHint();
+}
+$('cmode-range').onclick = () => setCmode('range');
+$('cmode-list').onclick = () => setCmode('list');
+function clearances() {
+  if (cmode === 'list') return nums($('clearances').value);
+  const s = +$('cstart').value, st = +$('cstep').value, n = Math.max(1, Math.min(20, Math.round(+$('ccount').value)));
+  return Array.from({ length: n }, (_, i) => Math.round((s + i * st) * 1e4) / 1e4);
+}
+function clearanceHint() {
+  const cs = clearances();
+  const ok = cs.length && cs.every(c => Number.isFinite(c));
+  $('chint').textContent = ok
+    ? `${cs.map(c => c.toFixed(c * 100 % 1 ? 3 : 2)).join(', ')} mm per side (diameter gap ${cs.map(c => +(2 * c).toFixed(3)).join(', ')} mm). Labels are in hundredths: C15 = 0.15 mm. On a Bambu P1S in PLA, 0.15–0.20 was right for a glued slip fit.`
+    : 'Enter numbers in mm.';
+}
+['cstart', 'cstep', 'ccount', 'clearances'].forEach(id => $(id).addEventListener('input', clearanceHint));
+
+function shapeChanged(resetDefaults) {
+  const s = $('shape').value, t = SHAPE_TEXT[s];
+  $('shapehint').textContent = t.hint; $('sizelabel').textContent = t.size; $('walllabel').textContent = t.wall;
+  document.querySelectorAll('.tube-only').forEach(e => e.hidden = s !== 'tube');
+  document.querySelectorAll('.square-only').forEach(e => e.hidden = s !== 'square');
+  document.querySelectorAll('.not-tube').forEach(e => e.hidden = s === 'tube');
+  if (resetDefaults && options) {
+    const d = options.shapes[s];
+    $('sizes').value = d.sizes.join(', '); $('lengths').value = d.lengths.join(', '); $('wall').value = d.wall;
+  }
+  orientHint();
+}
+function orientHint() {
+  const flat = $('orientation').value === 'flat', tube = $('shape').value === 'tube';
+  $('orienthint').textContent = flat
+    ? `The ${tube ? 'closed end' : 'head'} sits on the bed${tube ? ', cup open upward' : ', peg pointing up'}; the label is recessed into it and reads from below. Prints reliably.`
+    : 'The peg prints as a real part usually would, insertion end on the bed. Use it if your real part prints that way: the elephant foot then affects the fit.';
+}
+$('shape').onchange = () => shapeChanged(true);
+$('orientation').onchange = orientHint;
+$('chamferon').onchange = () => { $('chamfer').disabled = !$('chamferon').checked; };
+$('printer').onchange = () => { const v = $('printer').value; if (v !== 'custom') $('plate').value = v; };
+$('plate').addEventListener('input', () => {
+  const v = $('plate').value, opt = [...$('printer').options].find(o => o.value === v);
+  $('printer').value = opt ? v : 'custom';
+});
+
+function request() {
+  return {
+    shape: $('shape').value,
+    sizes: nums($('sizes').value),
+    clearances: clearances(),
+    lengths: nums($('lengths').value),
+    wall: $('wall').value === '' ? null : +$('wall').value,
+    chamfer: $('chamferon').checked ? +$('chamfer').value : 0,
+    seat: $('seat').value,
+    corner_radius: +$('corner').value,
+    orientation: $('orientation').value,
+    vent: $('vent').checked,
+    plate: +$('plate').value,
+  };
+}
+
+// ---------- viewer (same set-up and look as Rocket Builder) ----------
+const view = $('view');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.localClippingEnabled = true;
+view.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(35, 1, 1, 20000);
+camera.up.set(0, 0, 1);  // fitgen is Z-up, plate origin at the front-left corner
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+const touch = matchMedia('(pointer: coarse)').matches;
+const hintText = touch ? 'drag to rotate, pinch to zoom, two-finger drag to pan' : 'drag to rotate, scroll to zoom, right-drag to pan';
+const hemi = new THREE.HemisphereLight(0xffffff, 0x8890a0, 1.6); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(300, -400, 600); scene.add(sun);
+const fill2 = new THREE.DirectionalLight(0xffffff, 0.5); fill2.position.set(-300, 300, -200); scene.add(fill2);
+
+let framedSide = null, plateGroup = null, layoutModel = null, assembledModel = null, report = null, buildId = null, meshes = [];
+
+// ---------- build plate: the plate, a 10 mm grid, the margin, and an origin marker ----------
+function plateColors() {
+  return isLight() ? { plate: 0xd9dbe1, grid: 0xb4b8c2, major: 0x9095a3, edge: 0x7d8290 }
+                   : { plate: 0x2a2c32, grid: 0x3a3d45, major: 0x4d515c, edge: 0x5d6270 };
+}
+function makePlate(side, margin) {
+  if (plateGroup) { scene.remove(plateGroup); plateGroup.traverse(o => { o.geometry?.dispose(); o.material?.dispose(); }); }
+  const c = plateColors(), g = new THREE.Group();
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(side, side, 2),
+    new THREE.MeshStandardMaterial({ color: c.plate, roughness: 0.9, metalness: 0 }));
+  slab.position.set(side / 2, side / 2, -1.02); slab.userData.plate = true; g.add(slab);
+  const minor = [], major = [];
+  for (let v = 0; v <= side + 1e-6; v += 10) {
+    const arr = Math.round(v) % 50 === 0 ? major : minor;
+    arr.push(v, 0, 0, v, side, 0, 0, v, 0, side, v, 0);
+  }
+  const lines = (pts, color) => {
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+    const l = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color })); l.position.z = 0.02; return l;
+  };
+  g.add(lines(minor, c.grid), lines(major, c.major));
+  const m = margin, s = side;
+  g.add(lines([0, 0, 0, s, 0, 0, s, 0, 0, s, s, 0, s, s, 0, 0, s, 0, 0, s, 0, 0, 0, 0], c.edge));
+  const dash = new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(
+    [m, m, 0, s - m, m, 0, s - m, m, 0, s - m, s - m, 0, s - m, s - m, 0, m, s - m, 0, m, s - m, 0, m, m, 0], 3)),
+    new THREE.LineDashedMaterial({ color: c.edge, dashSize: 3, gapSize: 3 }));
+  dash.computeLineDistances(); dash.position.z = 0.03; g.add(dash);
+  // origin marker: X red, Y green, 20 mm
+  const ax = (to, color) => lines([0, 0, 0, ...to], color);
+  const ox = ax([20, 0, 0], 0xe5484d), oy = ax([0, 20, 0], 0x30a46c); ox.position.z = oy.position.z = 0.05;
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(1.4, 16, 10), new THREE.MeshBasicMaterial({ color: c.edge }));
+  g.add(ox, oy, dot);
+  plateGroup = g; scene.add(g); invalidate();
+  return g;
+}
+
+// ---------- theme ----------
+const themeBtn = $('theme');
+const darkMq = matchMedia('(prefers-color-scheme: dark)');
+function isLight() { return (document.documentElement.dataset.theme || (darkMq.matches ? 'dark' : 'light')) === 'light'; }
+function applyTheme() {
+  const light = isLight();
+  themeBtn.textContent = light ? 'Dark mode' : 'Light mode';
+  hemi.groundColor.set(light ? 0x8890a0 : 0x404858);
+  makePlate(report ? report.plate.side : +$('plate').value || 256, report ? report.plate.margin : 8);
+}
+themeBtn.onclick = () => {
+  const next = isLight() ? 'dark' : 'light';
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem('theme', next); } catch {}
+  applyTheme();
+};
+darkMq.addEventListener?.('change', applyTheme);
+
+// ---------- render on demand ----------
+let dirty = true;
+function invalidate() { dirty = true; }
+controls.addEventListener('change', invalidate);
+const loop = () => { if (controls.update() || dirty) { dirty = false; renderer.render(scene, camera); } };
+renderer.setAnimationLoop(loop);
+document.addEventListener('visibilitychange', () => { renderer.setAnimationLoop(document.hidden ? null : loop); invalidate(); });
+
+function resize() {
+  const w = Math.max(1, view.clientWidth), h = Math.max(1, view.clientHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+  invalidate();
+}
+new ResizeObserver(resize).observe(view); resize();
+addEventListener('orientationchange', () => setTimeout(resize, 300));
+renderer.domElement.addEventListener('webglcontextrestored', invalidate);
+
+function frame(side) {
+  // The whole plate, from the front and a little above, as in a slicer.
+  const c = new THREE.Vector3(side / 2, side / 2, 0);
+  const t = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  const dist = 0.78 * Math.max(side / 2 / t, side / 2 / (t * camera.aspect)) + side / 6;
+  controls.target.copy(c);
+  camera.position.copy(c).add(new THREE.Vector3(0, -1, 1.15).normalize().multiplyScalar(dist));
+  camera.near = dist / 100; camera.far = dist * 10; camera.updateProjectionMatrix();
+  invalidate();
+}
+
+// ---------- models ----------
+const byName = name => name ? report?.coupons.find(c => c.name === name.replace(/::socket$/, '')) : undefined;
+async function loadGlb(url) {
+  const gltf = await new GLTFLoader().loadAsync(url);
+  const root = gltf.scene;
+  root.traverse(o => {
+    if (!o.isMesh) return;
+    // GLTFLoader strips '.' and ':' from o.name (D18.4 -> D184); the original is in userData.name.
+    const name = o.userData.name || o.parent?.userData?.name || o.name || '';
+    const sock = name.endsWith('::socket');
+    const info = byName(name);
+    const rgb = sock ? [0.6, 0.63, 0.68] : info ? info.color : [0.7, 0.7, 0.7];
+    o.material = new THREE.MeshStandardMaterial({ color: new THREE.Color(...rgb), roughness: 0.55, metalness: 0.05, side: THREE.DoubleSide });
+    o.geometry.computeVertexNormals();
+    o.userData.coupon = info?.name; o.userData.socketCopy = sock;
+    // Section: cut each coupon through its own axis. three.js drops the plane's negative side, so this
+    // keeps the back half (y >= axis) and the cut faces the default camera; every row shows its clearance.
+    o.userData.cut = new THREE.Plane(new THREE.Vector3(0, 1, 0), -(info ? info.y : 0));
+  });
+  return root;
+}
+function applyView() {
+  const asm = $('assembled').checked, sec = $('section').checked;
+  if (layoutModel) layoutModel.visible = !asm;
+  if (assembledModel) assembledModel.visible = asm;
+  meshes = [];
+  for (const m of [asm ? assembledModel : layoutModel]) m?.traverse(o => {
+    if (!o.isMesh) return;
+    o.material.clippingPlanes = sec ? [o.userData.cut] : [];
+    o.material.needsUpdate = true;
+    meshes.push(o);
+  });
+  invalidate();
+}
+$('assembled').onchange = applyView;
+$('section').onchange = applyView;
+
+// ---------- hover / click: which coupon is this ----------
+const ray = new THREE.Raycaster(), ptr = new THREE.Vector2(), tip = $('tip');
+let hoverName = null, pinned = null;
+function pick(ev) {
+  const r = renderer.domElement.getBoundingClientRect();
+  ptr.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ptr, camera);
+  const sec = $('section').checked;
+  for (const h of ray.intersectObjects(meshes, false)) {
+    if (sec && h.object.userData.cut.distanceToPoint(h.point) < 0) continue;  // clipped away
+    return { name: h.object.userData.coupon, x: ev.clientX - r.left, y: ev.clientY - r.top };
+  }
+  return null;
+}
+function describe(c) {
+  if (!c) return '';
+  if (c.role === 'socket') return `<b>${c.name}</b> · socket, size ${c.size} mm · ${c.grams} g`;
+  return `<b>${c.name}</b> · ${c.clearance.toFixed(c.clearance * 100 % 1 ? 3 : 2)} mm radial (${+(2 * c.clearance).toFixed(3)} mm on the diameter) · `
+    + `${c.length} mm long · label ${c.label.join(' ')}`;
+}
+function showTip(hit) {
+  const name = hit?.name || null;
+  if (!hit) { tip.hidden = true; } else {
+    tip.innerHTML = describe(byName(name)); tip.hidden = false;
+    const w = view.clientWidth;
+    tip.style.left = `${Math.min(hit.x + 14, w - tip.offsetWidth - 8)}px`; tip.style.top = `${hit.y + 14}px`;
+  }
+  if (name !== hoverName) {
+    hoverName = name;
+    document.querySelectorAll('#coupons tr[data-name]').forEach(tr => tr.classList.toggle('hi', tr.dataset.name === (name || pinned)));
+    meshes.forEach(m => m.material.emissive?.setHex(m.userData.coupon === name && !m.userData.socketCopy ? 0x333333 : 0));
+    invalidate();
+  }
+}
+let moveRaf = 0;
+renderer.domElement.addEventListener('pointermove', ev => {
+  if (touch || ev.buttons) return;
+  cancelAnimationFrame(moveRaf); moveRaf = requestAnimationFrame(() => showTip(pick(ev)));
+});
+renderer.domElement.addEventListener('pointerleave', () => { if (!pinned) showTip(null); });
+let down = null;
+renderer.domElement.addEventListener('pointerdown', ev => { down = [ev.clientX, ev.clientY]; });
+renderer.domElement.addEventListener('pointerup', ev => {
+  if (!down || Math.hypot(ev.clientX - down[0], ev.clientY - down[1]) > 4) return;  // a drag, not a click
+  const hit = pick(ev); pinned = hit?.name || null; showTip(hit);
+});
+
+// ---------- status and progress ----------
+const statusEl = $('status'), progEl = $('progress'), progBar = progEl.firstElementChild;
+let progTimer = null;
+function setStatus(t) { statusEl.textContent = t; }
+function progressStart(estimate) {
+  progEl.hidden = false; progBar.style.width = '0'; const t0 = performance.now();
+  clearInterval(progTimer);
+  progTimer = setInterval(() => { progBar.style.width = `${Math.min(92, 100 * (1 - Math.exp(-(performance.now() - t0) / 1000 / estimate)))}%`; }, 200);
+}
+function progressEnd() {
+  clearInterval(progTimer); progTimer = null; progBar.style.width = '100%';
+  setTimeout(() => { if (!progTimer) { progEl.hidden = true; progBar.style.width = '0'; } }, 400);
+}
+
+// ---------- report ----------
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+function renderReport(r) {
+  const rgb = c => `rgb(${c.map(v => Math.round(v * 255)).join(',')})`;
+  const rows = r.coupons.map(c => `<tr data-name="${esc(c.name)}"><td><span class="sw" style="background:${rgb(c.color)}"></span>${esc(c.name)}</td>`
+    + (c.role === 'socket' ? `<td>socket</td><td class="n">–</td><td class="n">–</td>`
+      : `<td>${esc(c.label.join(' '))}</td><td class="n">${c.clearance.toFixed(c.clearance * 100 % 1 ? 3 : 2)}</td><td class="n">${c.length}</td>`)
+    + `<td class="n">${c.grams.toFixed(1)}</td></tr>`).join('');
+  const p = r.plate;
+  const fit = p.fits ? `<span class="ok">fits</span>` : `<span class="warn">doesn't fit</span>`;
+  const warn = r.warnings.length ? `<h2>Notes</h2><ul>${r.warnings.map(w => `<li class="warn">${esc(w)}</li>`).join('')}</ul>` : '';
+  $('report').innerHTML = `
+    <div>
+      <h2>Coupons</h2>
+      <table id="coupons"><thead><tr><th>Object</th><th>Label</th><th class="n">Clearance, mm radial</th><th class="n">Length, mm</th><th class="n">g</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+    </div>
+    <div>
+      <h2>Plate</h2>
+      <table><tbody>
+        <tr><td>Layout</td><td class="n">${p.width} × ${p.depth} mm on a ${p.side} mm plate: ${fit}</td></tr>
+        <tr><td>Coupons</td><td class="n">${r.count} (${r.pegs} pegs, ${r.count - r.pegs} sockets)</td></tr>
+        <tr><td>Filament</td><td class="n">about ${r.grams} g of PLA if printed solid (less with infill)</td></tr>
+      </tbody></table>
+      ${warn}
+      <h2>How to judge each peg</h2>
+      <dl class="guide">
+        <dt>Too tight</dt><dd>needs force or twisting, or won't reach the seat.</dd>
+        <dt>Right</dt><dd>slides to the seat with light pressure, no wobble.</dd>
+        <dt>Too loose</dt><dd>rocks or falls out.</dd>
+        <dt>Pull-out fits</dt><dd>holds its own weight upside down, drops with a light shake.</dd>
+      </dl>
+      <p class="hint">Try each peg square in its socket with finger pressure only. The right clearance is about midway between the last too-tight peg and the first too-loose one.</p>
+    </div>`;
+  document.querySelectorAll('#coupons tr[data-name]').forEach(tr => {
+    tr.onmouseenter = () => { if (!pinned) { hoverName = null; showTipFor(tr.dataset.name); } };
+    tr.onmouseleave = () => { if (!pinned) showTip(null); };
+  });
+}
+function showTipFor(name) {
+  meshes.forEach(m => m.material.emissive?.setHex(m.userData.coupon === name && !m.userData.socketCopy ? 0x333333 : 0));
+  document.querySelectorAll('#coupons tr[data-name]').forEach(tr => tr.classList.toggle('hi', tr.dataset.name === name));
+  hoverName = name; invalidate();
+}
+
+// ---------- build ----------
+$('form').onsubmit = async ev => {
+  ev.preventDefault();
+  const btn = $('build'); btn.disabled = true;
+  ['dl3mf', 'dlzip'].forEach(id => $(id).classList.add('off'));
+  const req = request();
+  const n = req.sizes.length * (1 + req.lengths.length * req.clearances.length);
+  setStatus(`Building ${n} coupons…`); progressStart(1 + 0.6 * n);
+  try {
+    const res = await fetch('/api/build', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req) });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = body.error || (Array.isArray(body.detail) ? body.detail.map(d => `${d.loc.at(-1)}: ${d.msg}`).join('; ') : body.detail) || res.statusText;
+      throw new Error(msg);
+    }
+    report = body.report; buildId = body.id; pinned = null;
+    setStatus('Loading the preview…');
+    const [lay, asm] = await Promise.all([loadGlb(`/api/builds/${buildId}/plate.glb`), loadGlb(`/api/builds/${buildId}/assembled.glb`)]);
+    for (const m of [layoutModel, assembledModel]) if (m) { scene.remove(m); m.traverse(o => { o.geometry?.dispose(); o.material?.dispose(); }); }
+    layoutModel = lay; assembledModel = asm; scene.add(lay, asm);
+    makePlate(report.plate.side, report.plate.margin);
+    if (framedSide !== report.plate.side) { frame(report.plate.side); framedSide = report.plate.side; }  // keep the user's view otherwise
+    applyView();
+    renderReport(report);
+    $('dl3mf').href = `/api/builds/${buildId}/fit_test.3mf`; $('dlzip').href = `/api/builds/${buildId}/stl.zip`;
+    ['dl3mf', 'dlzip'].forEach(id => $(id).classList.remove('off'));
+    setStatus(`${report.count} coupons, ${report.plate.fits ? 'fits the plate' : "doesn't fit the plate"} · ${hintText}`);
+  } catch (e) {
+    setStatus('Build failed.');
+    $('report').innerHTML = `<div class="error">${esc(e.message || e)}</div>`;
+  } finally {
+    btn.disabled = false; progressEnd();
+  }
+};
+
+// ---------- start ----------
+(async () => {
+  try { options = await (await fetch('/api/options')).json(); } catch { options = null; }
+  const pr = $('printer');
+  for (const [name, side] of Object.entries(options?.printers || { 'Bambu Lab X1C / P1S / A1': 256 })) pr.add(new Option(`${name} (${side} mm)`, side));
+  pr.add(new Option('Custom', 'custom'));
+  pr.value = '256';
+  shapeChanged(true);
+  if (!options) { $('sizes').value = '10'; $('lengths').value = '10'; $('wall').value = 2.5; }
+  setCmode('range');
+  applyTheme(); frame(256);
+})();
+</script>
+</body>
+</html>

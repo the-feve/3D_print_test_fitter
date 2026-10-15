@@ -1,0 +1,211 @@
+"""Fit Test Builder web server.
+
+POST /api/build builds the coupons for a parameter set (cached by a hash of
+the parameters plus fitgen's GENERATOR_VERSION, as Rocket Builder does) and
+returns the plate report. The page then loads the GLB previews (the plate
+layout, and every peg seated in a copy of its socket) and offers the 3MF and
+the STL ZIP, which are written on first download.
+
+    uvicorn server.app:app --reload        (from the repo root)
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import threading
+from collections import OrderedDict
+from pathlib import Path
+from typing import Literal
+
+import numpy as np
+import trimesh
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
+
+from fitgen import GENERATOR_VERSION, FitParams, GeometryError, build, layout, stl_zip, write_3mf
+from fitgen.coupons import DEFAULT_CLEARANCES, DEFAULT_LENGTHS, DEFAULT_SIZES, DEFAULT_WALL, code
+from fitgen.plate import MARGIN
+
+STATIC = Path(__file__).parent / "static"
+CACHE_SIZE = 12
+PRINTERS = {"Bambu Lab X1C / P1S / A1": 256, "Bambu Lab A1 mini": 180}
+SOCKET_COLOR = (0.60, 0.63, 0.68)
+# pegs graded by clearance, tight (blue) to loose (orange)
+TIGHT, LOOSE = np.array((0.16, 0.42, 0.86)), np.array((0.96, 0.52, 0.12))
+
+app = FastAPI(title="Fit Test Builder")
+app.mount("/static", StaticFiles(directory=STATIC), name="static")
+
+_builds: OrderedDict[str, dict] = OrderedDict()
+_lock = threading.Lock()  # one OpenCascade build at a time
+
+
+class BuildRequest(BaseModel):
+    shape: Literal["round", "square", "tube"] = "round"
+    sizes: list[float] = Field(default_factory=lambda: [10.0], max_length=6)
+    clearances: list[float] = Field(default_factory=lambda: list(DEFAULT_CLEARANCES), max_length=20)
+    lengths: list[float] = Field(default_factory=lambda: [10.0], max_length=5)
+    wall: float | None = None
+    chamfer: float = 0.5
+    seat: Literal["countersink", "flat"] = "countersink"
+    corner_radius: float = 1.0
+    orientation: Literal["flat", "functional"] = "flat"
+    vent: bool = True
+    plate: float = 256.0
+
+    def params(self) -> FitParams:
+        d = self.model_dump()
+        for k in ("sizes", "clearances", "lengths"):
+            d[k] = tuple(round(float(v), 4) for v in d[k])
+        return FitParams(**d)
+
+
+def _key(p: FitParams) -> str:
+    return hashlib.sha256(json.dumps([GENERATOR_VERSION, p.to_dict()], sort_keys=True).encode()).hexdigest()[:16]
+
+
+def _colors(items) -> dict[str, list[float]]:
+    cs = sorted({c.clearance for c in items if c.role == "peg"})
+    out = {}
+    for c in items:
+        if c.role == "socket":
+            out[c.name] = list(SOCKET_COLOR)
+        else:
+            t = cs.index(c.clearance) / max(1, len(cs) - 1)
+            out[c.name] = [round(float(v), 3) for v in TIGHT + (LOOSE - TIGHT) * t]
+    return out
+
+
+def _mesh(solid) -> trimesh.Trimesh:
+    verts, tris = solid.tessellate(0.02, 0.2)
+    return trimesh.Trimesh(np.array([(v.X, v.Y, v.Z) for v in verts]), np.array(tris), process=False)
+
+
+def _glbs(plate) -> tuple[bytes, bytes]:
+    """The plate layout, and each peg seated in a copy of its socket at the peg's place."""
+    flat, assembled = trimesh.Scene(), trimesh.Scene()
+    sockets = {p.coupon.name: p.coupon for p in plate.placed if p.coupon.role == "socket"}
+    for p in plate.placed:
+        c = p.coupon
+        flat.add_geometry(_mesh(p.solid), node_name=c.name, geom_name=c.name)
+        if c.role == "peg":
+            assembled.add_geometry(_mesh(c.seated.translate((p.x, p.y, 0))), node_name=c.name, geom_name=c.name)
+            sock = sockets[c.socket].print_solid.translate((p.x, p.y, 0))
+            assembled.add_geometry(_mesh(sock), node_name=f"{c.name}::socket", geom_name=f"{c.name}::socket")
+    return flat.export(file_type="glb"), assembled.export(file_type="glb")
+
+
+def _report(p: FitParams, plate, notes: list[str]) -> dict:
+    colors = _colors([q.coupon for q in plate.placed])
+    rows = []
+    for q in plate.placed:
+        c, bb = q.coupon, q.solid.bounding_box()
+        rows.append({
+            "name": c.name, "role": c.role, "size": c.size, "clearance": c.clearance, "length": c.length,
+            "code": code(c.clearance) if c.clearance is not None else None, "socket": c.socket,
+            "label": c.label, "x": round(q.x, 3), "y": round(q.y, 3), "color": colors[c.name],
+            "volume_mm3": round(c.volume, 1), "grams": round(c.grams, 2),
+            "width": round(bb.size.X, 1), "depth": round(bb.size.Y, 1), "height": round(bb.size.Z, 1),
+        })
+    warnings = list(notes)
+    if not plate.fits:
+        warnings.append(f"The layout is {plate.width:.0f} × {plate.depth:.0f} mm and doesn't fit inside a "
+                        f"{p.plate:g} mm plate with a {MARGIN:g} mm margin. Use fewer clearances, lengths or sizes, "
+                        "or a bigger plate.")
+    return {
+        "generator_version": GENERATOR_VERSION,
+        "params": p.to_dict(),
+        "coupons": rows,
+        "count": len(rows),
+        "pegs": sum(r["role"] == "peg" for r in rows),
+        "grams": round(sum(r["grams"] for r in rows), 1),
+        "plate": {"side": p.plate, "width": round(plate.width, 1), "depth": round(plate.depth, 1),
+                  "fits": plate.fits, "margin": MARGIN},
+        "warnings": warnings,
+    }
+
+
+def _get(build_id: str) -> dict:
+    b = _builds.get(build_id)
+    if b is None:
+        raise HTTPException(404, "That build has expired; press Build again.")
+    return b
+
+
+@app.get("/")
+def index():
+    return FileResponse(STATIC / "index.html")
+
+
+@app.get("/api/options")
+def options():
+    return {
+        "generator_version": GENERATOR_VERSION,
+        "shapes": {s: {"sizes": list(DEFAULT_SIZES[s]), "lengths": list(DEFAULT_LENGTHS[s]), "wall": DEFAULT_WALL[s]}
+                   for s in DEFAULT_WALL},
+        "clearances": list(DEFAULT_CLEARANCES),
+        "printers": PRINTERS,
+    }
+
+
+@app.post("/api/build")
+def build_set(req: BuildRequest):
+    try:
+        p = req.params()
+    except TypeError as e:
+        raise HTTPException(422, str(e))
+    key = _key(p)
+    with _lock:
+        if key not in _builds:
+            try:
+                items, notes = build(p)
+            except GeometryError as e:
+                return JSONResponse({"error": str(e)}, status_code=422)
+            plate = layout(items, p.plate)
+            flat, assembled = _glbs(plate)
+            _builds[key] = {"plate": plate, "items": items, "report": _report(p, plate, notes),
+                            "plate_glb": flat, "assembled_glb": assembled, "3mf": None, "zip": None}
+            while len(_builds) > CACHE_SIZE:
+                _builds.popitem(last=False)
+        _builds.move_to_end(key)
+    return {"id": key, "report": _builds[key]["report"]}
+
+
+@app.get("/api/builds/{build_id}/plate.glb")
+def plate_glb(build_id: str):
+    return Response(_get(build_id)["plate_glb"], media_type="model/gltf-binary")
+
+
+@app.get("/api/builds/{build_id}/assembled.glb")
+def assembled_glb(build_id: str):
+    return Response(_get(build_id)["assembled_glb"], media_type="model/gltf-binary")
+
+
+def _name(b: dict) -> str:
+    return f"fit_test_{b['report']['params']['shape']}"
+
+
+@app.get("/api/builds/{build_id}/fit_test.3mf")
+def download_3mf(build_id: str):
+    b = _get(build_id)
+    with _lock:
+        if b["3mf"] is None:
+            import tempfile
+            with tempfile.TemporaryDirectory() as tmp:
+                b["3mf"] = write_3mf(b["plate"], Path(tmp) / "plate.3mf").read_bytes()
+    return Response(b["3mf"], media_type="model/3mf",
+                    headers={"Content-Disposition": f'attachment; filename="{_name(b)}.3mf"'})
+
+
+@app.get("/api/builds/{build_id}/stl.zip")
+def download_zip(build_id: str):
+    b = _get(build_id)
+    with _lock:
+        if b["zip"] is None:
+            extra = {"fit_test.json": json.dumps(b["report"], indent=2).encode()}
+            b["zip"] = stl_zip(b["items"], extra)
+    return Response(b["zip"], media_type="application/zip",
+                    headers={"Content-Disposition": f'attachment; filename="{_name(b)}_stl.zip"'})
