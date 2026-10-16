@@ -20,7 +20,8 @@ Milestones are from `docs/spec.md`. Done items move to HANDOFF.md's log.
 - [ ] One socket per peg (now one per size).
 - [ ] Rectangular (non-square) pegs.
 
-## Milestone 4: hosting (owner decides)
+## Milestone 4: hosting (owner steps in HANDOFF.md → Hosting setup)
+- [ ] Claude: relative URLs in the page; mount + deploy checkout + test in rocket-builder-web (PR).
 - [ ] Mount into the Fly app `rocket-fevergeon` like Trebuchet Builder (`rocket-builder-web/server/trebuchet_mount.py` + `HostRouter`), behind the admin email list at first.
 - [ ] Host name (e.g. `fit.quiverdesignworks.net`), DNS-only A/AAAA to the Fly IPs, Fly cert.
 - [ ] Links from quiverdesignworks.net and the builders' switcher (`nav.apps`) — only once the owner says it's ready.

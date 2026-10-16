@@ -1,6 +1,6 @@
 # Handoff
 
-_Last updated 2026-10-15._
+_Last updated 2026-10-16._
 
 ## State
 
@@ -13,6 +13,23 @@ Milestones 1 and 2 of `docs/spec.md` are done and run locally; nothing is deploy
 ## Next steps
 
 See `TODO.md`. In short: print the first plates and check them, then milestone 3 (results form, print sheet, presets, split across plates), then hosting (owner decides).
+
+## Hosting setup (owner steps)
+
+Plan (2026-10-16): run inside the existing Fly app `rocket-fevergeon`, the way Trebuchet Builder does, at **fit.quiverdesignworks.net**. No extra cost. The owner does the account steps below; Claude does the code (relative URLs in this repo, a mount + deploy step + test in rocket-builder-web, opened as a PR there).
+
+1. **GitHub read token** (do any time). github.com/settings/personal-access-tokens/new → fine-grained; name `fit-test-deploy`; Repository access: *Only select repositories* → `3D_print_test_fitter`; Permissions → Repository → **Contents: Read-only**; Generate, copy.
+   Then github.com/the-feve/rocket-builder-web → Settings → Secrets and variables → Actions → **New repository secret** → name `FIT_REPO_TOKEN`, paste, Add secret.
+   *Check:* the list shows `FIT_REPO_TOKEN` next to `TREBUCHET_REPO_TOKEN`. (Skip this step if this repo is made public.)
+2. **`main` branch here.** Merge the PR Claude opens in this repo (or ask Claude to create `main` from the working branch). *Check:* github.com/the-feve/3D_print_test_fitter shows branch `main`.
+3. **Merge the rocket-builder-web PR** (titled "Host Fit Test Builder…"). Its deploy runs automatically. *Check:* Actions → *Deploy to Fly.io* is green, and https://rocket-fevergeon.fly.dev/fit/ shows Fit Test Builder.
+4. **Cloudflare DNS.** dash.cloudflare.com → quiverdesignworks.net → DNS → Records → **Add record**: Type `CNAME`, Name `fit`, Target `rocket-fevergeon.fly.dev`, Proxy status **DNS only** (grey cloud), Save.
+   *Check:* the record list shows `fit` → `rocket-fevergeon.fly.dev`, grey cloud.
+5. **Fly certificate.** fly.io/dashboard → `rocket-fevergeon` → **Certificates** → **Add certificate** → `fit.quiverdesignworks.net` (or `fly certs add fit.quiverdesignworks.net -a rocket-fevergeon`).
+   *Check:* the certificate's status turns **Issued** / Verified (a few minutes after step 4), then https://fit.quiverdesignworks.net loads.
+6. Optional: turn the Cloudflare record's proxy on (orange) later only if wanted; leave it grey until the certificate is issued.
+
+Don't link it from quiverdesignworks.net or the builders until the owner says so.
 
 ## Decisions
 
@@ -34,4 +51,5 @@ See `TODO.md`. In short: print the first plates and check them, then milestone 3
 
 ## Log
 
+- 2026-10-16: hosting plan and owner steps written (Hosting setup).
 - 2026-10-15: repo created; milestone 1 (fitgen + CLI + tests) and milestone 2 (FastAPI + page) built and checked in a headless browser.
