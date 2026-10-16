@@ -120,8 +120,8 @@
 </script>
 <script type="importmap">
 { "imports": {
-  "three": "/static/vendor/three/build/three.module.js",
-  "three/addons/": "/static/vendor/three/examples/jsm/"
+  "three": "static/vendor/three/build/three.module.js",
+  "three/addons/": "static/vendor/three/examples/jsm/"
 } }
 </script>
 </head>
@@ -532,7 +532,7 @@ $('form').onsubmit = async ev => {
   const n = req.sizes.length * (1 + req.lengths.length * req.clearances.length);
   setStatus(`Building ${n} coupons…`); progressStart(1 + 0.6 * n);
   try {
-    const res = await fetch('/api/build', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req) });
+    const res = await fetch('api/build', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req) });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
       const msg = body.error || (Array.isArray(body.detail) ? body.detail.map(d => `${d.loc.at(-1)}: ${d.msg}`).join('; ') : body.detail) || res.statusText;
@@ -540,14 +540,14 @@ $('form').onsubmit = async ev => {
     }
     report = body.report; buildId = body.id; pinned = null;
     setStatus('Loading the preview…');
-    const [lay, asm] = await Promise.all([loadGlb(`/api/builds/${buildId}/plate.glb`), loadGlb(`/api/builds/${buildId}/assembled.glb`)]);
+    const [lay, asm] = await Promise.all([loadGlb(`api/builds/${buildId}/plate.glb`), loadGlb(`api/builds/${buildId}/assembled.glb`)]);
     for (const m of [layoutModel, assembledModel]) if (m) { scene.remove(m); m.traverse(o => { o.geometry?.dispose(); o.material?.dispose(); }); }
     layoutModel = lay; assembledModel = asm; scene.add(lay, asm);
     makePlate(report.plate.side, report.plate.margin);
     if (framedSide !== report.plate.side) { frame(report.plate.side); framedSide = report.plate.side; }  // keep the user's view otherwise
     applyView();
     renderReport(report);
-    $('dl3mf').href = `/api/builds/${buildId}/fit_test.3mf`; $('dlzip').href = `/api/builds/${buildId}/stl.zip`;
+    $('dl3mf').href = `api/builds/${buildId}/fit_test.3mf`; $('dlzip').href = `api/builds/${buildId}/stl.zip`;
     ['dl3mf', 'dlzip'].forEach(id => $(id).classList.remove('off'));
     setStatus(`${report.count} coupons, ${report.plate.fits ? 'fits the plate' : "doesn't fit the plate"} · ${hintText}`);
   } catch (e) {
@@ -560,7 +560,7 @@ $('form').onsubmit = async ev => {
 
 // ---------- start ----------
 (async () => {
-  try { options = await (await fetch('/api/options')).json(); } catch { options = null; }
+  try { options = await (await fetch('api/options')).json(); } catch { options = null; }
   const pr = $('printer');
   for (const [name, side] of Object.entries(options?.printers || { 'Bambu Lab X1C / P1S / A1': 256 })) pr.add(new Option(`${name} (${side} mm)`, side));
   pr.add(new Option('Custom', 'custom'));

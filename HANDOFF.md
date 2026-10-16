@@ -1,6 +1,6 @@
 # Handoff
 
-_Last updated 2026-10-15._
+_Last updated 2026-10-16._
 
 ## State
 
@@ -12,7 +12,15 @@ Milestones 1 and 2 of `docs/spec.md` are done and run locally; nothing is deploy
 
 ## Next steps
 
-See `TODO.md`. In short: print the first plates and check them, then milestone 3 (results form, print sheet, presets, split across plates), then hosting (owner decides).
+See `TODO.md`. In short: print the first plates and check them, then milestone 3 (results form, print sheet, presets, split across plates).
+
+**Hosting, owner steps** (the Fly and Cloudflare tokens weren't in the 2026-10-16 cloud session: no environment variable, not proxy-injected, so nothing could be checked or changed on Fly or Cloudflare from there):
+1. This repo needs a `main` branch: merge `claude/inspiring-mayer-m1ipwo` (open a PR, or ask a session to), or create `main` from it.
+2. Read access for the deploy: edit the existing fine-grained token behind rocket-builder-web's `TREBUCHET_REPO_TOKEN` (github.com/settings/personal-access-tokens) and add 3D_print_test_fitter to its repositories (Contents: Read-only). Or make a new one and save it in rocket-builder-web's Actions secrets as `FIT_REPO_TOKEN`. Don't paste it in chat.
+3. Merge the rocket-builder-web branch `claude/inspiring-mayer-m1ipwo`. The deploy checks `https://rocket-fevergeon.fly.dev/fit` redirects. Sign in to Rocket Builder as an admin and open https://rocket.quiverdesignworks.net/fit/ (visitors get a 404).
+4. Own address, when wanted: Cloudflare DNS → `fit` A `66.241.125.123` and AAAA `2a09:8280:1::1ae:4f69:0` (the Fly IPs trebuchet uses; DNS only, grey cloud), then `fly certs add fit.quiverdesignworks.net -a rocket-fevergeon`. It stays a 404 there until opened: the sign-in cookie belongs to the rocket host.
+5. Open it to everyone: `fly secrets set ROCKETGEN_FIT=open -a rocket-fevergeon`. Links from quiverdesignworks.net only when the owner says.
+6. For a cloud session to do steps 4–5 itself: add the tokens to the cloud environment's settings (Network secrets, or environment variables `FLY_API_TOKEN` and `CLOUDFLARE_API_TOKEN`), then start a new session.
 
 ## Decisions
 
@@ -24,7 +32,7 @@ See `TODO.md`. In short: print the first plates and check them, then milestone 3
 - **Tube port:** same profile as the rocket (`shoulder_foot`, 45° rise, 5 mm band, 1.6 mm closed end, 45° inner step), but generic: size = bore, wall = tube wall, shoulder length = engagement length. The socket's label is now recessed into the bottom of a 2 mm tab (was raised on the rocket's flag).
 - **3MF read-back test parses the XML** (`Mesher().read` took ~50 s for 6 objects).
 - **Clearance codes** are hundredths of a mm with one decimal when needed (0.175 → C17.5); two clearances with the same code are rejected.
-- **Hosting plan unchanged from the spec:** mount in the existing Fly app at zero extra cost; not done yet.
+- **Hosting (2026-10-16): mounted in Rocket Builder's Fly app `rocket-fevergeon`**, like Trebuchet Builder, at zero extra cost. rocket-builder-web `server/fit_mount.py` loads `server/app.py` from a `fittest/` checkout and mounts it at `/fit/`; `HostRouter` sends `fit.*` hosts there. Rocket Builder gates it to admin accounts (`ROCKETGEN_ADMIN_EMAILS`) until `ROCKETGEN_FIT=open` is set, and swaps in its build lock so a rocket and a coupon set never build at once on the 1 GB machine (this app's `_turn()` reads `_lock` at call time for that). So the page's URLs are relative (`api/…`, `static/…`). New builds are rate-limited per address (`FITGEN_BUILDS_PER_10_MIN`, 30) and wait at most `FITGEN_BUILD_WAIT_S` (60 s) for the lock. The code is on rocket-builder-web branch `claude/inspiring-mayer-m1ipwo`, not merged; owner steps below.
 
 ## Gotchas
 
@@ -34,4 +42,5 @@ See `TODO.md`. In short: print the first plates and check them, then milestone 3
 
 ## Log
 
+- 2026-10-16: hosting code: relative page URLs, per-address build limit, bounded lock wait, lock shared with the host; the mount and admin gate in rocket-builder-web. Fly / Cloudflare tokens not available in the session.
 - 2026-10-15: repo created; milestone 1 (fitgen + CLI + tests) and milestone 2 (FastAPI + page) built and checked in a headless browser.

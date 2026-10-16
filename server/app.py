@@ -13,14 +13,17 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import threading
-from collections import OrderedDict
+import time
+from collections import OrderedDict, defaultdict, deque
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Literal
 
 import numpy as np
 import trimesh
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -41,6 +44,39 @@ app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 _builds: OrderedDict[str, dict] = OrderedDict()
 _lock = threading.Lock()  # one OpenCascade build at a time
+# Hosted in Rocket Builder's Fly app, which swaps in its own lock so the two
+# never build at once on the 1 GB machine. A visitor waits at most
+# BUILD_WAIT_S for their turn, and each address gets a budget of new
+# (uncached) builds, as on Rocket Builder.
+BUILD_WAIT_S = float(os.environ.get("FITGEN_BUILD_WAIT_S", 60))
+BUILDS_PER_10_MIN = int(os.environ.get("FITGEN_BUILDS_PER_10_MIN", 30))
+_hits: defaultdict[str, deque] = defaultdict(deque)
+
+
+def _client(request: Request) -> str:
+    # Behind Cloudflare and Fly's proxy the socket address is the proxy's.
+    h = request.headers
+    return h.get("cf-connecting-ip") or h.get("fly-client-ip") or (request.client.host if request.client else "?")
+
+
+def _rate_limit(request: Request) -> None:
+    now, q = time.monotonic(), _hits[_client(request)]
+    while q and now - q[0] > 600:
+        q.popleft()
+    if len(q) >= BUILDS_PER_10_MIN:
+        raise HTTPException(429, "Too many builds from your address; wait a few minutes and try again.")
+    q.append(now)
+
+
+@contextmanager
+def _turn():
+    lock = _lock  # read at call time: the host app may have replaced it
+    if not lock.acquire(timeout=BUILD_WAIT_S):
+        raise HTTPException(503, "The builder is busy; try again in a minute.")
+    try:
+        yield
+    finally:
+        lock.release()
 
 
 class BuildRequest(BaseModel):
@@ -152,13 +188,15 @@ def options():
 
 
 @app.post("/api/build")
-def build_set(req: BuildRequest):
+def build_set(req: BuildRequest, request: Request):
     try:
         p = req.params()
     except TypeError as e:
         raise HTTPException(422, str(e))
     key = _key(p)
-    with _lock:
+    if key not in _builds:
+        _rate_limit(request)
+    with _turn():
         if key not in _builds:
             try:
                 items, notes = build(p)
@@ -191,7 +229,7 @@ def _name(b: dict) -> str:
 @app.get("/api/builds/{build_id}/fit_test.3mf")
 def download_3mf(build_id: str):
     b = _get(build_id)
-    with _lock:
+    with _turn():
         if b["3mf"] is None:
             import tempfile
             with tempfile.TemporaryDirectory() as tmp:
@@ -203,7 +241,7 @@ def download_3mf(build_id: str):
 @app.get("/api/builds/{build_id}/stl.zip")
 def download_zip(build_id: str):
     b = _get(build_id)
-    with _lock:
+    with _turn():
         if b["zip"] is None:
             extra = {"fit_test.json": json.dumps(b["report"], indent=2).encode()}
             b["zip"] = stl_zip(b["items"], extra)

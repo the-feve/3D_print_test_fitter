@@ -42,3 +42,23 @@ def test_bad_request_is_explained():
     r = client.post("/api/build", json={**REQ, "shape": "tube", "sizes": [5]})
     assert r.status_code == 422 and "too small" in r.json()["error"]
     assert client.get("/api/builds/nope/plate.glb").status_code == 404
+
+
+def test_page_works_under_a_prefix():
+    # Rocket Builder's Fly app mounts this at /fit/, so the page's URLs are relative.
+    from fastapi import FastAPI
+    host = FastAPI()
+    host.mount("/fit", app)
+    c = TestClient(host)
+    page = c.get("/fit/").text
+    assert "'/api/" not in page and '"/static/' not in page and "`/api/" not in page
+    assert c.get("/fit/static/vendor/three/build/three.module.js").status_code == 200
+    assert "shapes" in c.get("/fit/api/options").json()
+
+
+def test_new_builds_are_rate_limited(monkeypatch):
+    import server.app as srv
+    monkeypatch.setattr(srv, "BUILDS_PER_10_MIN", 0)
+    monkeypatch.setattr(srv, "_hits", srv.defaultdict(srv.deque))
+    r = client.post("/api/build", json={**REQ, "clearances": [0.3]})
+    assert r.status_code == 429 and "Too many" in r.json()["detail"]
