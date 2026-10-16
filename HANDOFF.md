@@ -16,6 +16,12 @@ See `TODO.md`. In short: print the first plates and check them, then milestone 3
 
 ## Hosting setup (owner steps)
 
+**Status (2026-10-16, end of session):** nothing done yet on either side. The owner is doing the account steps tonight, without giving Claude any Fly or Cloudflare tokens (owner's choice; delete any Fly / Cloudflare tokens or variables added to the Claude environment while trying that). Defaults until the owner says otherwise: address `fit.quiverdesignworks.net`, **unlisted** (noindex, no links), not admin-only.
+
+**Claude's part, not started:** (a) this repo: the page fetches `/static/...` and `/api/...` from the site root; make them relative so it works mounted under `/fit/` and at `fit.*`; add a per-IP build rate limit (copy Rocket Builder's `_rate_limit`); open a PR here so merging it creates `main`. (b) rocket-builder-web: `server/fit_mount.py` modelled on `trebuchet_mount.py` (`FIT_DIR`, mount at `/fit`, `HostRouter` sends `fit.*` hosts there), Dockerfile / deploy.yml checkout of this repo's `main` into `fit/` with `FIT_REPO_TOKEN` (skip with a warning if missing, like Trebuchet), a post-deploy check that `/fit/` answers, and a mount test; open it as a separate PR for the owner to merge. Watch the 1 GB machine: a rocket and a fit build at once may need a shared build lock or 2 GB.
+
+**Kickoff for the next session:** "Read 3D_print_test_fitter HANDOFF.md → Hosting setup and do Claude's part: the relative-URL change and rate limit here (PR), and the Fit Test Builder mount PR in rocket-builder-web. Then check which owner steps are done."
+
 Plan (2026-10-16): run inside the existing Fly app `rocket-fevergeon`, the way Trebuchet Builder does, at **fit.quiverdesignworks.net**. No extra cost. The owner does the account steps below; Claude does the code (relative URLs in this repo, a mount + deploy step + test in rocket-builder-web, opened as a PR there).
 
 1. **GitHub read token** (do any time). github.com/settings/personal-access-tokens/new → fine-grained; name `fit-test-deploy`; Repository access: *Only select repositories* → `3D_print_test_fitter`; Permissions → Repository → **Contents: Read-only**; Generate, copy.
@@ -51,5 +57,5 @@ Don't link it from quiverdesignworks.net or the builders until the owner says so
 
 ## Log
 
-- 2026-10-16: hosting plan and owner steps written (Hosting setup).
+- 2026-10-16: hosting plan and owner steps written (Hosting setup); owner does the account steps, Claude the code (not started).
 - 2026-10-15: repo created; milestone 1 (fitgen + CLI + tests) and milestone 2 (FastAPI + page) built and checked in a headless browser.
