@@ -1,6 +1,6 @@
 # Handoff
 
-_Last updated 2026-10-16._
+_Last updated 2026-10-17._
 
 ## State
 
@@ -14,13 +14,24 @@ Milestones 1 and 2 of `docs/spec.md` are done and run locally; nothing is deploy
 
 See `TODO.md`. In short: print the first plates and check them, then milestone 3 (results form, print sheet, presets, split across plates).
 
-**Hosting, owner steps** (the Fly and Cloudflare tokens weren't in the 2026-10-16 cloud session: no environment variable, not proxy-injected, so nothing could be checked or changed on Fly or Cloudflare from there):
-1. This repo needs a `main` branch: merge `claude/inspiring-mayer-m1ipwo` (open a PR, or ask a session to), or create `main` from it.
-2. Read access for the deploy: edit the existing fine-grained token behind rocket-builder-web's `TREBUCHET_REPO_TOKEN` (github.com/settings/personal-access-tokens) and add 3D_print_test_fitter to its repositories (Contents: Read-only). Or make a new one and save it in rocket-builder-web's Actions secrets as `FIT_REPO_TOKEN`. Don't paste it in chat.
-3. Merge the rocket-builder-web branch `claude/inspiring-mayer-m1ipwo`. The deploy checks `https://rocket-fevergeon.fly.dev/fit` redirects. Sign in to Rocket Builder as an admin and open https://rocket.quiverdesignworks.net/fit/ (visitors get a 404).
-4. Own address, when wanted: Cloudflare DNS → `fit` A `66.241.125.123` and AAAA `2a09:8280:1::1ae:4f69:0` (the Fly IPs trebuchet uses; DNS only, grey cloud), then `fly certs add fit.quiverdesignworks.net -a rocket-fevergeon`. It stays a 404 there until opened: the sign-in cookie belongs to the rocket host.
-5. Open it to everyone: `fly secrets set ROCKETGEN_FIT=open -a rocket-fevergeon`. Links from quiverdesignworks.net only when the owner says.
-6. For a cloud session to do steps 4–5 itself: add the tokens to the cloud environment's settings (Network secrets, or environment variables `FLY_API_TOKEN` and `CLOUDFLARE_API_TOKEN`), then start a new session.
+## Hosting setup (owner steps)
+
+Runs inside the existing Fly app `rocket-fevergeon`, the way Trebuchet Builder does, at **fit.quiverdesignworks.net**, no extra cost. Owner's choices (2026-10-16): Claude gets **no Fly or Cloudflare tokens** (the owner does the account steps; delete any Fly / Cloudflare tokens or variables added to the Claude environment while trying that); **unlisted** (noindex, no links), not admin-only.
+
+**Status (2026-10-17):** Claude's code is done: relative URLs and the per-address build limit here, now on `main` (created 2026-10-17 from `claude/inspiring-mayer-m1ipwo` + the plan notes); the mount, deploy checkout and tests in rocket-builder-web, open as a PR there ("Host Fit Test Builder…"). Owner steps not started.
+
+1. **GitHub read token: do this first; it is the one thing blocking the deploy.** github.com/settings/personal-access-tokens/new → fine-grained; name `fit-test-deploy`; Resource owner `the-feve`; Repository access: *Only select repositories* → `3D_print_test_fitter`; Permissions → Repository → **Contents: Read-only**; Generate, copy.
+   Then github.com/the-feve/rocket-builder-web → Settings → Secrets and variables → Actions → **New repository secret** → name `FIT_REPO_TOKEN`, paste, Add secret. Don't paste it in chat.
+   *Check:* the list shows `FIT_REPO_TOKEN` next to `TREBUCHET_REPO_TOKEN`. (Instead of a new token you can edit the trebuchet one to add this repo; the deploy falls back to it. Skip this step if this repo is made public.)
+2. ~~**`main` branch here.**~~ Done 2026-10-17. Optional: Settings → General → Default branch → `main`.
+3. **Merge the rocket-builder-web PR** (titled "Host Fit Test Builder…"). Its deploy runs automatically. *Check:* Actions → *Deploy to Fly.io* is green, with no "Fit Test Builder not checked out" warning, and https://rocket-fevergeon.fly.dev/fit/ shows Fit Test Builder.
+4. **Cloudflare DNS.** dash.cloudflare.com → quiverdesignworks.net → DNS → Records → **Add record**: Type `CNAME`, Name `fit`, Target `rocket-fevergeon.fly.dev`, Proxy status **DNS only** (grey cloud), Save. (Trebuchet ended up with A `66.241.125.123` / AAAA `2a09:8280:1::1ae:4f69:0` instead; either works.)
+   *Check:* the record list shows `fit` → `rocket-fevergeon.fly.dev`, grey cloud.
+5. **Fly certificate.** fly.io/dashboard → `rocket-fevergeon` → **Certificates** → **Add certificate** → `fit.quiverdesignworks.net` (or `fly certs add fit.quiverdesignworks.net -a rocket-fevergeon`).
+   *Check:* the certificate's status turns **Issued** / Verified (a few minutes after step 4), then https://fit.quiverdesignworks.net loads.
+6. Optional: turn the Cloudflare record's proxy on (orange) later only if wanted; leave it grey until the certificate is issued. To make it admin-only instead of unlisted: `fly secrets set ROCKETGEN_FIT=admin -a rocket-fevergeon`.
+
+Don't link it from quiverdesignworks.net or the builders until the owner says so.
 
 ## Decisions
 
@@ -32,7 +43,7 @@ See `TODO.md`. In short: print the first plates and check them, then milestone 3
 - **Tube port:** same profile as the rocket (`shoulder_foot`, 45° rise, 5 mm band, 1.6 mm closed end, 45° inner step), but generic: size = bore, wall = tube wall, shoulder length = engagement length. The socket's label is now recessed into the bottom of a 2 mm tab (was raised on the rocket's flag).
 - **3MF read-back test parses the XML** (`Mesher().read` took ~50 s for 6 objects).
 - **Clearance codes** are hundredths of a mm with one decimal when needed (0.175 → C17.5); two clearances with the same code are rejected.
-- **Hosting (2026-10-16): mounted in Rocket Builder's Fly app `rocket-fevergeon`**, like Trebuchet Builder, at zero extra cost. rocket-builder-web `server/fit_mount.py` loads `server/app.py` from a `fittest/` checkout and mounts it at `/fit/`; `HostRouter` sends `fit.*` hosts there. Rocket Builder gates it to admin accounts (`ROCKETGEN_ADMIN_EMAILS`) until `ROCKETGEN_FIT=open` is set, and swaps in its build lock so a rocket and a coupon set never build at once on the 1 GB machine (this app's `_turn()` reads `_lock` at call time for that). So the page's URLs are relative (`api/…`, `static/…`). New builds are rate-limited per address (`FITGEN_BUILDS_PER_10_MIN`, 30) and wait at most `FITGEN_BUILD_WAIT_S` (60 s) for the lock. The code is on rocket-builder-web branch `claude/inspiring-mayer-m1ipwo`, not merged; owner steps below.
+- **Hosting (2026-10-16): mounted in Rocket Builder's Fly app `rocket-fevergeon`**, like Trebuchet Builder, at zero extra cost. rocket-builder-web `server/fit_mount.py` loads `server/app.py` from a `fittest/` checkout and mounts it at `/fit/`; `HostRouter` sends `fit.*` hosts there. It is unlisted: Rocket Builder adds `X-Robots-Tag: noindex` to every response (and the page has a robots meta tag); `ROCKETGEN_FIT=admin` restricts it to admin accounts (`ROCKETGEN_ADMIN_EMAILS`). Rocket Builder also swaps in its build lock so a rocket and a coupon set never build at once on the 1 GB machine (this app's `_turn()` reads `_lock` at call time for that). So the page's URLs are relative (`api/…`, `static/…`). New builds are rate-limited per address (`FITGEN_BUILDS_PER_10_MIN`, 30) and wait at most `FITGEN_BUILD_WAIT_S` (60 s) for the lock. Owner steps: Hosting setup above.
 
 ## Gotchas
 
@@ -42,5 +53,7 @@ See `TODO.md`. In short: print the first plates and check them, then milestone 3
 
 ## Log
 
+- 2026-10-17: `main` created; hosting made unlisted (noindex) instead of admin-only, per the owner's 2026-10-16 choice.
 - 2026-10-16: hosting code: relative page URLs, per-address build limit, bounded lock wait, lock shared with the host; the mount and admin gate in rocket-builder-web. Fly / Cloudflare tokens not available in the session.
+- 2026-10-16: hosting plan and owner steps written (Hosting setup); owner does the account steps, Claude the code (not started).
 - 2026-10-15: repo created; milestone 1 (fitgen + CLI + tests) and milestone 2 (FastAPI + page) built and checked in a headless browser.

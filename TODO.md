@@ -20,11 +20,12 @@ Milestones are from `docs/spec.md`. Done items move to HANDOFF.md's log.
 - [ ] One socket per peg (now one per size).
 - [ ] Rectangular (non-square) pegs.
 
-## Milestone 4: hosting
-- [x] Mount code in rocket-builder-web (`server/fit_mount.py`, admin-only gate, shared build lock) and per-address build limit here. Branch `claude/inspiring-mayer-m1ipwo` in both repos, not merged.
-- [ ] Owner: `main` here, a token that can read this repo, merge rocket-builder-web (HANDOFF.md Next steps 1–3).
-- [ ] `fit.quiverdesignworks.net`: A/AAAA to the Fly IPs (DNS only), `fly certs add` (step 4).
-- [ ] Open to everyone (`ROCKETGEN_FIT=open`) and links from quiverdesignworks.net and the builders' switcher (`nav.apps`) — only once the owner says it's ready.
+## Milestone 4: hosting (owner steps in HANDOFF.md → Hosting setup)
+- [x] Claude: relative URLs, per-address build limit here; mount (unlisted, noindex, shared build lock), deploy checkout and tests in rocket-builder-web (PR).
+- [x] `main` branch here (2026-10-17).
+- [ ] Owner: `FIT_REPO_TOKEN` (step 1), merge the rocket-builder-web PR (step 3).
+- [ ] Owner: `fit.quiverdesignworks.net` DNS (DNS only) and Fly cert (steps 4–5).
+- [ ] Links from quiverdesignworks.net and the builders' switcher (`nav.apps`) — only once the owner says it's ready.
 
 ## Milestone 5: later shapes
 - [ ] Hex (nut traps), D-shaft, dovetail slide, press-fit pin, snap-fit hook, thread (pitch × clearance).
