@@ -83,7 +83,7 @@ def test_rocket_mode_build():
                                         "clearances": [0.15], "thread_clearances": [0.25]})
     assert r.status_code == 200, r.text
     rep = r.json()["report"]
-    assert rep["mode"] == "rocket" and rep["rocket"]["body_id"] == 13.4
+    assert rep["mode"] == "rocket" and rep["rockets"][0]["body_id"] == 13.4
     assert [c["name"] for c in rep["coupons"]] == ["D13.4_socket", "D13.4_L10_C15", "D13.4_L7_C15", "M13_boss", "M13_T25"]
     z = client.get(f"/api/builds/{r.json()['id']}/stl.zip")
     assert 'filename="fit_test_rocket_M13_stl.zip"' in z.headers["content-disposition"]

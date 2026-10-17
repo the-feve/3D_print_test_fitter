@@ -73,6 +73,16 @@
   [aria-invalid=true] { border-color:var(--err) !important; background:var(--errbg) !important; }
   #formerr { flex:1 1 100%; margin:0; color:var(--err); background:var(--errbg); border:1px solid var(--errline); padding:7px 9px; border-radius:6px; font-size:12.5px; }
   #formerr ul { margin:2px 0 0; padding-left:16px; }
+  label.motorrow { grid-template-columns:1fr 170px; }
+  .addrow { display:flex; gap:6px; }
+  .addrow select { flex:1; min-width:0; }
+  button.small { flex:none; padding:4px 12px; font:600 12px system-ui; border:1px solid var(--line); background:transparent; color:var(--ink); }
+  button.small:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); }
+  button.small:disabled { opacity:.4; cursor:default; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin:2px 0 6px; }
+  .chips button { flex:none; padding:3px 6px 3px 10px; border:1px solid var(--line); border-radius:14px; background:var(--card); color:var(--ink); font:600 12px system-ui; }
+  .chips button span { color:var(--muted); margin-left:6px; font-weight:400; }
+  .chips button:hover span { color:var(--err); }
   .linkbtn { flex:1 1 100%; text-align:center; padding:2px 0 0; border:0; background:none; color:var(--muted); font:500 12px system-ui; text-decoration:underline; cursor:pointer; }
   .actions { position:sticky; bottom:-16px; background:var(--panel); padding:10px 0 6px; display:flex; flex-wrap:wrap; gap:8px; border-top:1px solid var(--line); margin-top:12px; }
   button, a.btn { flex:1; padding:9px 12px; border-radius:6px; border:1px solid transparent; font:600 14px system-ui, -apple-system, sans-serif; cursor:pointer; text-align:center; text-decoration:none; }
@@ -142,10 +152,12 @@
     <p class="hint" id="modehint"></p>
     <fieldset class="rocket-only">
       <legend>Rocket</legend>
-      <label>Motor size <select id="motor"></select></label>
+      <label class="motorrow">Motor sizes <span class="addrow"><select id="motor" aria-label="Motor size to add"></select><button type="button" id="addmotor" class="small">Add</button></span></label>
+      <input type="hidden" id="motors" value="M18">
+      <div id="motorchips" class="chips" aria-label="Motor sizes on this plate"></div>
       <label>Wall thickness, mm<input type="number" id="rwall" step="0.1" min="0.8" max="3" value="1.5"></label>
       <label>Body OD offset, mm<input type="number" id="roffset" step="0.1" min="0" max="80" value="0"></label>
-      <p class="hint">The same three inputs as Rocket Builder's Body section: they set the tube bore and the joint lengths.</p>
+      <p class="hint">Pick a size and press Add for each motor size to test on one plate. Wall and offset are Rocket Builder's Body inputs: with the motor they set the tube bore and the joint lengths.</p>
       <p class="hint" id="rdims"></p>
       <label class="check"><span>Body joint <span id="jbodylen" class="hint"></span></span><input type="checkbox" id="jbody" checked></label>
       <label class="check"><span>Nose joint <span id="jnoselen" class="hint"></span></span><input type="checkbox" id="jnose"></label>
@@ -330,23 +342,46 @@ function orientHint() {
 }
 
 // The rocket's numbers, from the server (fitgen/rocket.py, Rocket Builder's arithmetic).
-let rdims = null, rdimsSeq = 0;
+const motorOrder = () => [...$('motor').options].map(o => o.value);
+const motorsList = () => $('motors').value.split(',').map(x => x.trim()).filter(m => motorOrder().includes(m));
+function setMotors(list) {
+  const order = motorOrder();
+  $('motors').value = [...new Set(list)].sort((a, b) => order.indexOf(a) - order.indexOf(b)).join(',');
+  renderMotors(); rocketDims(); save();
+}
+function renderMotors() {
+  const list = motorsList();
+  $('motorchips').innerHTML = list.length
+    ? list.map(m => `<button type="button" data-m="${esc(m)}" title="Remove ${esc(m)}">${esc(m)}<span aria-hidden="true">✕</span></button>`).join('')
+    : '<span class="hint">No motor sizes yet: pick one and press Add.</span>';
+  $('motorchips').querySelectorAll('button').forEach(b => b.onclick = () => setMotors(motorsList().filter(m => m !== b.dataset.m)));
+  $('addmotor').disabled = list.includes($('motor').value);
+}
+$('addmotor').onclick = () => { setMotors([...motorsList(), $('motor').value]); $('motor').removeAttribute('aria-invalid'); };
+$('motor').addEventListener('change', renderMotors);
+let rdims = null, rdimsAll = [], rdimsSeq = 0;
 async function rocketDims() {
-  const q = new URLSearchParams({ motor: $('motor').value || 'M18', wall: $('rwall').value || 1.5, offset: $('roffset').value || 0 });
-  const seq = ++rdimsSeq;
+  const list = motorsList(), seq = ++rdimsSeq;
+  if (!list.length) { rdims = null; rdimsAll = []; $('rdims').textContent = ''; ['jbodylen', 'jnoselen', 'jthreadlen'].forEach(id => $(id).textContent = ''); return; }
   try {
-    const r = await fetch(`api/rocket?${q}`), d = await r.json();
+    const got = await Promise.all(list.map(async m => {
+      const q = new URLSearchParams({ motor: m, wall: $('rwall').value || 1.5, offset: $('roffset').value || 0 });
+      const r = await fetch(`api/rocket?${q}`);
+      return { ok: r.ok, d: await r.json() };
+    }));
     if (seq !== rdimsSeq) return;
-    if (!r.ok) { rdims = null; $('rdims').textContent = d.error || 'Check the rocket inputs.'; return; }
-    rdims = d;
-    $('rdims').textContent = `Body tube ${d.body_od} mm OD, ${d.body_id} mm bore; motor bay ${d.bay_id} mm.`;
-    $('jbodylen').textContent = `· ${d.lengths.body} mm shoulder`;
-    $('jnoselen').textContent = `· ${d.lengths.nose} mm shoulder`;
-    $('jthreadlen').textContent = `· ${d.thread.pitch} mm pitch, ${d.thread.turns} turns`;
+    const bad = got.find(g => !g.ok);
+    if (bad) { rdims = null; $('rdims').textContent = bad.d.error || 'Check the rocket inputs.'; return; }
+    rdimsAll = got.map(g => g.d); rdims = rdimsAll[0];
+    const uniq = xs => [...new Set(xs)].join(', ');
+    $('rdims').innerHTML = rdimsAll.map(d => `<b>${esc(d.motor)}</b>: body tube ${d.body_od} mm OD, ${d.body_id} mm bore; motor bay ${d.bay_id} mm.`).join('<br>');
+    $('jbodylen').textContent = `· ${uniq(rdimsAll.map(d => d.lengths.body))} mm shoulder`;
+    $('jnoselen').textContent = `· ${uniq(rdimsAll.map(d => d.lengths.nose))} mm shoulder`;
+    $('jthreadlen').textContent = `· ${uniq(rdimsAll.map(d => d.thread.pitch))} mm pitch, ${rdims.thread.turns} turns`;
     clearanceHint();
   } catch { /* offline: the build will say so */ }
 }
-['motor', 'rwall', 'roffset'].forEach(id => $(id).addEventListener('input', rocketDims));
+['rwall', 'roffset'].forEach(id => $(id).addEventListener('input', rocketDims));
 ['jbody', 'jnose', 'jthread'].forEach(id => $(id).addEventListener('change', refresh));
 
 $('shape').onchange = () => shapeChanged(true);
@@ -367,7 +402,7 @@ function request() {
   };
   if (mode === 'rocket') return {
     mode, ...common,
-    motor: $('motor').value, wall: +$('rwall').value, body_offset: +$('roffset').value || 0,
+    motors: motorsList(), wall: +$('rwall').value, body_offset: +$('roffset').value || 0,
     joints: ['body', 'nose'].filter(j => $(`j${j}`).checked), seat: $('rseat').value,
     thread: $('jthread').checked, thread_clearances: threadClearances(),
   };
@@ -394,6 +429,7 @@ function problems(req) {
   n('plate', 'Plate size', 60, 500);
   if (req.mode === 'rocket') {
     n('rwall', 'Wall thickness', 0.8, 3); n('roffset', 'Body OD offset', 0, 80);
+    if (!req.motors.length) bad('motor', 'Add at least one motor size: pick it and press Add.');
     if (!req.joints.length && !req.thread) bad('jbody', 'Tick at least one thing to test: a joint or the motor thread.');
     if (req.thread) { n('tstart', 'Thread clearance start', 0.05, 1); n('tstep', 'Thread clearance step', 0.01, 0.5); n('tcount', 'Thread clearance count', 1, 12); }
   } else {
@@ -443,13 +479,13 @@ document.getElementById('form').addEventListener('input', save);
 document.getElementById('form').addEventListener('change', save);
 $('reset').onclick = () => {
   const ids = mode === 'rocket'
-    ? ['motor', 'rwall', 'roffset', 'jbody', 'jnose', 'jthread', 'rseat', 'tstart', 'tstep', 'tcount']
+    ? ['motors', 'rwall', 'roffset', 'jbody', 'jnose', 'jthread', 'rseat', 'tstart', 'tstep', 'tcount']
     : ['shape', 'sizes', 'lengths', 'wall', 'seat', 'corner', 'vent'];
   for (const id of [...ids, 'cstart', 'cstep', 'ccount', 'clearances', 'chamferon', 'chamfer', 'orientation', 'plate']) {
     const e = $(id); if (e.type === 'checkbox') e.checked = defaults.v[id]; else e.value = defaults.v[id];
   }
   setCmode('range'); $('chamfer').disabled = !$('chamferon').checked; $('plate').dispatchEvent(new Event('input'));
-  showErrors([]); shapeChanged(false); rocketDims(); save();
+  showErrors([]); shapeChanged(false); renderMotors(); rocketDims(); save();
 };
 
 // ---------- viewer (same set-up and look as Rocket Builder) ----------
@@ -706,10 +742,11 @@ $('form').onsubmit = async ev => {
   showErrors([]); save();
   const btn = $('build'); btn.disabled = true;
   ['dl3mf', 'dlzip'].forEach(id => $(id).classList.add('off'));
+  const k = req.mode === 'rocket' ? req.motors.length : 1;
   const n = req.mode === 'rocket'
-    ? 1 + req.joints.length * req.clearances.length + (req.joints.length ? 1 : 0) + (req.thread ? 1 + req.thread_clearances.length : 0)
+    ? k * (req.joints.length * req.clearances.length + (req.joints.length ? 1 : 0) + (req.thread ? 1 + req.thread_clearances.length : 0))
     : req.sizes.length * (1 + req.lengths.length * req.clearances.length);
-  const est = req.mode === 'rocket' ? 1 + 0.6 * req.joints.length * req.clearances.length + (req.thread ? 2 + 4 * req.thread_clearances.length : 0) : 1 + 0.6 * n;
+  const est = req.mode === 'rocket' ? 1 + k * (0.6 * req.joints.length * req.clearances.length + (req.thread ? 2 + 4 * req.thread_clearances.length : 0)) : 1 + 0.6 * n;
   setStatus(`Building ${n} coupons…`); progressStart(est);
   try {
     let res;
@@ -761,7 +798,7 @@ $('form').onsubmit = async ev => {
   $('plate').dispatchEvent(new Event('input'));
   const h = location.hash.slice(1);
   setMode(h === 'rocket' || h === 'general' ? h : saved?.mode || 'general');
-  shapeChanged(false); rocketDims();
+  renderMotors(); shapeChanged(false); rocketDims();
   applyTheme(); frame(256);
 })();
 </script>

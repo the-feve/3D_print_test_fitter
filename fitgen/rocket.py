@@ -25,7 +25,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from . import thread
-from .coupons import DEFAULT_CLEARANCES, Coupon, FitParams, _flag, _to_print, build as build_set, code, num
+from .coupons import DEFAULT_CLEARANCES, Coupon, FitParams, _flag, build as build_set, code
 from .geom import GeometryError
 
 DATA = Path(__file__).resolve().parent / "data"
@@ -91,9 +91,10 @@ def params(motor: str = "M18", wall: float | None = None, offset: float = 0.0, j
 @dataclass
 class RocketParams:
     """A Rocket Builder preset: the joint coupons (tube shape, from the
-    motor, wall and body OD offset) and the motor-retention thread coupons."""
+    motor, wall and body OD offset) and the motor-retention thread coupons,
+    for one or more motor sizes."""
 
-    motor: str = "M18"
+    motors: tuple[str, ...] = ("M18",)
     wall: float | None = None  # None = Rocket Builder's (1.5 mm)
     offset: float = 0.0  # body OD offset, radial mm, as on Rocket Builder
     joints: tuple[str, ...] = ("body",)
@@ -107,23 +108,48 @@ class RocketParams:
 
     def to_dict(self) -> dict:
         d = asdict(self)
-        for k in ("joints", "clearances", "thread_clearances"):
+        for k in ("motors", "joints", "clearances", "thread_clearances"):
             d[k] = list(d[k])
         d["mode"] = "rocket"
         return d
 
-    def joint_params(self) -> FitParams | None:
+    def joint_params(self, motor: str) -> FitParams | None:
         if not self.joints:
             return None
-        return params(self.motor, self.wall, self.offset, self.joints, clearances=self.clearances,
-                      chamfer=self.chamfer, seat=self.seat, orientation=self.orientation, plate=self.plate)
+        return params(motor, self.wall, self.offset, self.joints, clearances=self.clearances, chamfer=self.chamfer,
+                      seat=self.seat, orientation=self.orientation, plate=self.plate, label_size=len(self.motors) > 1)
+
+
+MAX_PEGS = 60  # joint pegs + caps on one plate, all motors
+MAX_CAPS = 15  # thread caps, all motors: about 3.5 s each to build
 
 
 def build(p: RocketParams) -> tuple[list[Coupon], list[str]]:
-    """Joint coupons first (socket, then pegs), then the boss and its caps."""
-    d = dims(p.motor, p.wall, p.offset)  # validates motor, wall and offset
+    """For each motor size: its joint coupons (socket, then pegs), then its
+    boss and caps. Motors with the same joints and thread as one already
+    on the plate (M24 and M24L: only the motor length differs) are skipped
+    with a note."""
+    if not p.motors:
+        raise GeometryError("Add at least one motor size.")
+    if len(set(p.motors)) != len(p.motors):
+        raise GeometryError("Each motor size only once, please.")
     if not p.joints and not p.thread:
         raise GeometryError("Pick something to test: a joint, the motor thread or both.")
+    sets, notes, seen = [], [], {}
+    for m in p.motors:
+        d = dims(m, p.wall, p.offset)  # validates motor, wall and offset
+        same = (d["body_id"], tuple(d["lengths"].values()), d["bay_id"], d["thread"]["pitch"])
+        if same in seen:
+            notes.append(f"{m} has the same joints and thread as {seen[same]}, so it isn't repeated: use the {seen[same]} coupons.")
+            continue
+        seen[same] = m
+        sets.append((m, d))
+    n_caps = len(sets) * len(p.thread_clearances) if p.thread else 0
+    n_pegs = len(sets) * len(p.joints) * len(p.clearances) + n_caps
+    if n_caps > MAX_CAPS:
+        raise GeometryError(f"That's {n_caps} motor caps; keep it to {MAX_CAPS} or fewer (fewer motor sizes or thread clearances).")
+    if n_pegs > MAX_PEGS:
+        raise GeometryError(f"That's {n_pegs} pegs and caps; keep it to {MAX_PEGS} or fewer (fewer motor sizes or clearances).")
     if p.thread:
         tc = p.thread_clearances
         if not tc or len(tc) > 12:
@@ -133,20 +159,24 @@ def build(p: RocketParams) -> tuple[list[Coupon], list[str]]:
         for c in tc:
             if not 0.05 <= c <= 1.0:
                 raise GeometryError(f"Thread clearance {c} mm is out of range (0.05 to 1 mm radial).")
-    jp = p.joint_params()
-    out, notes = build_set(jp) if jp else ([], [])
-    if p.thread:
-        mtr_d, tag = motors()[p.motor], p.motor
-        flat = p.orientation == "flat"
-        boss_name = f"{tag}_boss"
-        out.append(Coupon(boss_name, "socket", d["bay_id"],
-                          thread.boss_coupon(mtr_d, d["bay_id"], d["wall"], tag, _flag), label=[tag]))
-        for c in p.thread_clearances:
-            name, lines = f"{tag}_T{code(c)}", [f"T{code(c)}"]
-            printed, seated = thread.cap_coupon(mtr_d, d["bay_id"], d["wall"], c, lines, name)
-            # The cap always prints face down (as on Rocket Builder): its
-            # thread's 45-degree flanks need that way up.
-            out.append(Coupon(name, "peg", d["bay_id"], printed, clearance=c, length=thread.length(mtr_d),
-                              seated=seated, socket=boss_name, label=lines))
-        del flat
+    out = []
+    for m, d in sets:
+        jp = p.joint_params(m)
+        if jp:
+            items, n = build_set(jp)
+            out += items
+            notes += n
+        if p.thread:
+            mtr_d = motors()[m]
+            boss_name = f"{m}_boss"
+            out.append(Coupon(boss_name, "socket", d["bay_id"],
+                              thread.boss_coupon(mtr_d, d["bay_id"], d["wall"], m, _flag), label=[m]))
+            for c in p.thread_clearances:
+                name = f"{m}_T{code(c)}"
+                lines = [f"T{code(c)}"] + ([m] if len(p.motors) > 1 else [])
+                # The cap always prints face down (as on Rocket Builder): its
+                # thread's 45-degree flanks need that way up.
+                printed, seated = thread.cap_coupon(mtr_d, d["bay_id"], d["wall"], c, lines, name)
+                out.append(Coupon(name, "peg", d["bay_id"], printed, clearance=c, length=thread.length(mtr_d),
+                                  seated=seated, socket=boss_name, label=lines))
     return out, notes

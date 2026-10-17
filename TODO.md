@@ -13,7 +13,7 @@ Milestones are from `docs/spec.md`. Done items move to HANDOFF.md's log.
 - [ ] Split a set that doesn't fit across plates (one 3MF per plate) instead of only warning.
 
 ## Rocket Builder tab
-- [ ] Owner: Rocket Builder Advanced inputs for the critical fit dimensions (joint clearance, shoulder lengths, thread clearance / pitch) so a result from here can be typed in there (rocket-builder-web; asked 2026-10-17).
+- [ ] Rocket Builder Advanced *Fits and joints* inputs (joint clearance, joint lengths, thread clearance / pitch / turns): built 2026-10-17 in rocket-builder-web (PR, not merged). Once merged, this tab could offer the same overrides so a coupon matches a customised rocket.
 - [ ] Optional: motor-in-bay coupons (rings at a few clearances to try a real motor in; Rocket Builder uses 0.2 mm, `mtr_clear`).
 - [ ] Optional: print the thread boss tail-down like the real aft (now flange down).
 

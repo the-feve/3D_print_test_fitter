@@ -95,7 +95,8 @@ class BuildRequest(BaseModel):
     vent: bool = True
     plate: float = 256.0
     # rocket mode
-    motor: str = "M18"
+    motor: str = "M18"  # one motor (older requests); `motors` wins when given
+    motors: list[str] = Field(default_factory=list, max_length=5)
     body_offset: float = 0.0
     joints: list[Literal["body", "nose"]] = Field(default_factory=lambda: ["body"], max_length=2)
     thread: bool = True
@@ -106,11 +107,11 @@ class BuildRequest(BaseModel):
         for k in ("sizes", "clearances", "lengths", "thread_clearances"):
             d[k] = tuple(round(float(v), 4) for v in d[k])
         if self.mode == "rocket":
-            return rocket.RocketParams(motor=self.motor, wall=self.wall, offset=self.body_offset,
+            return rocket.RocketParams(motors=tuple(self.motors or [self.motor]), wall=self.wall, offset=self.body_offset,
                                        joints=tuple(self.joints), clearances=d["clearances"], thread=self.thread,
                                        thread_clearances=d["thread_clearances"], chamfer=self.chamfer, seat=self.seat,
                                        orientation=self.orientation, plate=self.plate)
-        for k in ("mode", "motor", "body_offset", "joints", "thread", "thread_clearances"):
+        for k in ("mode", "motor", "motors", "body_offset", "joints", "thread", "thread_clearances"):
             d.pop(k)
         return FitParams(**d)
 
@@ -171,7 +172,7 @@ def _report(p, plate, notes: list[str]) -> dict:
         warnings.append(f"The layout is {plate.width:.0f} × {plate.depth:.0f} mm and doesn't fit inside a "
                         f"{p.plate:g} mm plate with a {MARGIN:g} mm margin. Use fewer clearances, lengths or sizes, "
                         "or a bigger plate.")
-    extra = {"rocket": rocket.dims(p.motor, p.wall, p.offset)} if isinstance(p, rocket.RocketParams) else {}
+    extra = {"rockets": [rocket.dims(m, p.wall, p.offset) for m in p.motors]} if isinstance(p, rocket.RocketParams) else {}
     return {
         "generator_version": GENERATOR_VERSION,
         "mode": "rocket" if extra else "general",
@@ -260,7 +261,7 @@ def assembled_glb(build_id: str):
 
 def _name(b: dict) -> str:
     pr = b["report"]["params"]
-    return f"fit_test_rocket_{pr['motor']}" if b["report"]["mode"] == "rocket" else f"fit_test_{pr['shape']}"
+    return f"fit_test_rocket_{'-'.join(pr['motors'])}" if b["report"]["mode"] == "rocket" else f"fit_test_{pr['shape']}"
 
 
 @app.get("/api/builds/{build_id}/fit_test.3mf")
