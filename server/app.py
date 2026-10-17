@@ -18,6 +18,7 @@ import threading
 import time
 from collections import OrderedDict, defaultdict, deque
 from contextlib import contextmanager
+from dataclasses import replace
 from pathlib import Path
 from typing import Literal
 
@@ -33,7 +34,7 @@ from fitgen.coupons import CORNERED, DEFAULT_CLEARANCES, DEFAULT_LENGTHS, DEFAUL
 from fitgen.plate import MARGIN
 
 STATIC = Path(__file__).parent / "static"
-CACHE_SIZE = 12
+CACHE_SIZE = 24  # one-motor rocket sets are cached one by one and combined into plates
 PRINTERS = {"Bambu Lab X1C / P1S / A1": 256, "Bambu Lab A1 mini": 180}
 SOCKET_COLOR = (0.60, 0.63, 0.68)
 # pegs graded by clearance, tight (blue) to loose (orange)
@@ -96,7 +97,8 @@ class BuildRequest(BaseModel):
     plate: float = 256.0
     # rocket mode
     motor: str = "M18"  # one motor (older requests); `motors` wins when given
-    motors: list[str] = Field(default_factory=list, max_length=5)
+    motors: list[str] = Field(default_factory=list, max_length=5)  # fitgen allows 2 per request (rocket.MAX_MOTORS)
+    label_motor: bool = False  # the page builds one motor at a time for a plate of several: label the size
     body_offset: float = 0.0
     joints: list[Literal["body", "nose"]] = Field(default_factory=lambda: ["body"], max_length=2)
     thread: bool = True
@@ -110,8 +112,8 @@ class BuildRequest(BaseModel):
             return rocket.RocketParams(motors=tuple(self.motors or [self.motor]), wall=self.wall, offset=self.body_offset,
                                        joints=tuple(self.joints), clearances=d["clearances"], thread=self.thread,
                                        thread_clearances=d["thread_clearances"], chamfer=self.chamfer, seat=self.seat,
-                                       orientation=self.orientation, plate=self.plate)
-        for k in ("mode", "motor", "motors", "body_offset", "joints", "thread", "thread_clearances"):
+                                       orientation=self.orientation, plate=self.plate, label_motor=self.label_motor)
+        for k in ("mode", "motor", "motors", "label_motor", "body_offset", "joints", "thread", "thread_clearances"):
             d.pop(k)
         return FitParams(**d)
 
@@ -241,10 +243,52 @@ def build_set(req: BuildRequest, request: Request):
                 return JSONResponse({"error": str(e)}, status_code=422)
             plate = layout(items, p.plate)
             flat, assembled = _glbs(plate)
-            _builds[key] = {"plate": plate, "items": items, "report": _report(p, plate, notes),
-                            "plate_glb": flat, "assembled_glb": assembled, "3mf": None, "zip": None}
-            while len(_builds) > CACHE_SIZE:
-                _builds.popitem(last=False)
+            _store(key, p, items, notes, plate)
+        _builds.move_to_end(key)
+    return {"id": key, "report": _builds[key]["report"]}
+
+
+def _store(key: str, p, items, notes: list[str], plate) -> None:
+    flat, assembled = _glbs(plate)
+    _builds[key] = {"p": p, "notes": notes, "plate": plate, "items": items, "report": _report(p, plate, notes),
+                    "plate_glb": flat, "assembled_glb": assembled, "3mf": None, "zip": None}
+    while len(_builds) > CACHE_SIZE:
+        _builds.popitem(last=False)
+
+
+class PlateRequest(BaseModel):
+    ids: list[str] = Field(min_length=1, max_length=6)
+    plate: float = Field(256.0, ge=60, le=500)
+
+
+@app.post("/api/plate")
+def combine(req: PlateRequest):
+    """Several rocket sets built one motor at a time (each a cached build), laid
+    out together on one plate, so no single request has to build them all.
+    Answers like /api/build; the downloads work on the returned id."""
+    key = "plate-" + hashlib.sha256(json.dumps([GENERATOR_VERSION, req.ids, req.plate]).encode()).hexdigest()[:16]
+    with _turn():
+        if key not in _builds:
+            parts = [_get(i) for i in req.ids]
+            ps = [b["p"] for b in parts]
+            if not all(isinstance(q, rocket.RocketParams) for q in ps):
+                return JSONResponse({"error": "Only Rocket Builder sets can be combined on a plate."}, status_code=422)
+            items = [c for b in parts for c in b["items"]]
+            names = [c.name for c in items]
+            dup = sorted({n for n in names if names.count(n) > 1})
+            if dup:
+                return JSONResponse({"error": f"Those sets share coupons ({', '.join(dup[:3])}); add each motor size once."},
+                                    status_code=422)
+            caps = sum(c.role == "peg" and c.socket and c.socket.endswith("_boss") for c in items)
+            pegs = sum(c.role == "peg" for c in items)
+            if caps > rocket.MAX_CAPS or pegs > rocket.MAX_PEGS:
+                return JSONResponse({"error": f"That plate would have {pegs} pegs and caps ({caps} caps); keep it to "
+                                              f"{rocket.MAX_PEGS} and {rocket.MAX_CAPS} (fewer sizes or clearances)."},
+                                    status_code=422)
+            motors = tuple(m for q in ps for m in q.motors)
+            p = replace(ps[0], motors=motors, label_motor=True, plate=req.plate)
+            notes = list(dict.fromkeys(n for b in parts for n in b["notes"]))
+            _store(key, p, items, notes, layout(items, req.plate))
         _builds.move_to_end(key)
     return {"id": key, "report": _builds[key]["report"]}
 

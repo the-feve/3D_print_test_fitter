@@ -96,3 +96,22 @@ def test_general_polygon_build_and_messages():
     assert r.status_code == 422 and "quarter" in r.json()["error"]
     r = client.post("/api/build", json={"mode": "rocket", "joints": [], "thread": False})
     assert r.status_code == 422 and "Pick something" in r.json()["error"]
+
+
+def test_plate_combines_one_motor_builds():
+    base = {"mode": "rocket", "joints": ["body"], "clearances": [0.15], "thread_clearances": [0.25], "label_motor": True}
+    a = client.post("/api/build", json={**base, "motors": ["M13"]}).json()["id"]
+    b = client.post("/api/build", json={**base, "motors": ["M18"]}).json()["id"]
+    r = client.post("/api/plate", json={"ids": [a, b]})
+    assert r.status_code == 200, r.text
+    rep = r.json()["report"]
+    assert rep["params"]["motors"] == ["M13", "M18"] and [d["motor"] for d in rep["rockets"]] == ["M13", "M18"]
+    assert [c["name"] for c in rep["coupons"]][::4] == ["D13.4_socket", "D18.4_socket"] and rep["count"] == 8
+    pid = r.json()["id"]
+    assert client.get(f"/api/builds/{pid}/plate.glb").content[:4] == b"glTF"
+    z = client.get(f"/api/builds/{pid}/stl.zip")
+    assert 'fit_test_rocket_M13-M18_stl.zip' in z.headers["content-disposition"]
+    assert client.post("/api/plate", json={"ids": [a, a]}).json()["error"].startswith("Those sets share")
+    assert client.post("/api/plate", json={"ids": ["nope"]}).status_code == 404
+    g = client.post("/api/build", json={"shape": "round", "sizes": [8], "clearances": [0.1], "lengths": [6]}).json()["id"]
+    assert "Only Rocket Builder" in client.post("/api/plate", json={"ids": [a, g]}).json()["error"]

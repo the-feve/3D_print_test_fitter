@@ -27,7 +27,8 @@ def test_dims_follow_rocket_builder():
     (dict(motors=("M99",)), "Unknown motor"),
     (dict(motors=()), "at least one motor"),
     (dict(motors=("M18", "M18")), "only once"),
-    (dict(motors=("M13", "M18", "M24", "M29")), "motor caps"),
+    (dict(motors=("M13", "M18", "M24")), "at most 2"),
+    (dict(motors=("M13", "M18"), thread_clearances=tuple(0.1 + 0.05 * i for i in range(8))), "motor caps"),
     (dict(wall=4.0), "between 0.8 and 3"),
     (dict(joints=(), thread=False), "Pick something"),
     (dict(joints=(), thread_clearances=(0.2, 0.2001)), "must not repeat"),
@@ -83,12 +84,20 @@ def test_default_rocket_set_fits_the_plate():
 
 
 def test_several_motor_sizes_on_one_plate():
-    items, notes = build(RocketParams(motors=("M13", "M24", "M24L"), joints=("body",), clearances=(0.15,),
+    items, notes = build(RocketParams(motors=("M13", "M24"), joints=("body",), clearances=(0.15,),
                                       thread_clearances=(0.25,)))
     names = [c.name for c in items]
     assert names == ["D13.4_socket", "D13.4_L10_C15", "M13_boss", "M13_T25",
                      "D24.4_socket", "D24.4_L16.5_C15", "M24_boss", "M24_T25"]
+    _, notes = build(RocketParams(motors=("M24", "M24L"), joints=(), thread_clearances=(0.25,)))
     assert any("M24L has the same joints and thread as M24" in n for n in notes)
     labels = {c.name: c.label for c in items}
     assert labels["D13.4_L10_C15"] == ["C15", "D13.4"] and labels["M24_T25"] == ["T25", "M24"]
     assert layout(items, 256.0).fits
+
+
+def test_one_motor_labelled_to_join_a_plate():
+    items, _ = build(RocketParams(motors=("M13",), joints=("body",), clearances=(0.15,), thread_clearances=(0.25,),
+                                  label_motor=True))
+    labels = {c.name: c.label for c in items}
+    assert labels["D13.4_L10_C15"] == ["C15", "D13.4"] and labels["M13_T25"] == ["T25", "M13"]

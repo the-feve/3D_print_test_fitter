@@ -157,7 +157,7 @@
       <div id="motorchips" class="chips" aria-label="Motor sizes on this plate"></div>
       <label>Wall thickness, mm<input type="number" id="rwall" step="0.1" min="0.8" max="3" value="1.5"></label>
       <label>Body OD offset, mm<input type="number" id="roffset" step="0.1" min="0" max="80" value="0"></label>
-      <p class="hint">Pick a size and press Add for each motor size to test on one plate. Wall and offset are Rocket Builder's Body inputs: with the motor they set the tube bore and the joint lengths.</p>
+      <p class="hint">Pick a size and press Add for each motor size to test on one plate; they're built one after another and added to the plate as each finishes. Wall and offset are Rocket Builder's Body inputs: with the motor they set the tube bore and the joint lengths.</p>
       <p class="hint" id="rdims"></p>
       <label class="check"><span>Body joint <span id="jbodylen" class="hint"></span></span><input type="checkbox" id="jbody" checked></label>
       <label class="check"><span>Nose joint <span id="jnoselen" class="hint"></span></span><input type="checkbox" id="jnose"></label>
@@ -195,9 +195,9 @@
     <fieldset class="rocket-only thread-only">
       <legend>Thread clearance (radial)</legend>
       <div class="row3">
-        <label>Start, mm<input type="number" id="tstart" step="0.01" min="0.05" max="1" value="0.15"></label>
+        <label>Start, mm<input type="number" id="tstart" step="0.01" min="0.05" max="1" value="0.2"></label>
         <label>Step, mm<input type="number" id="tstep" step="0.01" min="0.01" max="0.5" value="0.05"></label>
-        <label>Count<input type="number" id="tcount" step="1" min="1" max="12" value="5"></label>
+        <label>Count<input type="number" id="tcount" step="1" min="1" max="12" value="3"></label>
       </div>
       <p class="hint" id="thint"></p>
     </fieldset>
@@ -452,7 +452,7 @@ document.querySelectorAll('#form input, #form select').forEach(e => e.addEventLi
 }));
 
 // ---------- remember the inputs in this browser (per tab), and reset ----------
-const STORE = 'fit-test-builder:v2';
+const STORE = 'fit-test-builder:v3';  // v3: 3 thread caps by default
 const FIELDS = [...document.querySelectorAll('#form input, #form select')].map(e => e.id).filter(id => id && id !== 'printer');
 let defaults = {};
 function snapshot() {
@@ -734,6 +734,38 @@ function showTipFor(name) {
 }
 
 // ---------- build ----------
+async function post(url, payload) {
+  let res;
+  try { res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); }
+  catch { throw new Error("Couldn't reach the server. Check your connection and press Build again; your settings are kept."); }
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = body.error || (Array.isArray(body.detail) ? body.detail.map(d => `${d.loc.at(-1)}: ${d.msg}`).join('; ') : body.detail)
+      || (res.status >= 500 ? `The server had a problem (${res.status}). Try again in a minute; your settings are kept.` : res.statusText);
+    throw new Error(msg);
+  }
+  return body;
+}
+async function show(body, done = true) {
+  report = body.report; buildId = body.id; pinned = null;
+  const [lay, asm] = await Promise.all([loadGlb(`api/builds/${buildId}/plate.glb`), loadGlb(`api/builds/${buildId}/assembled.glb`)]);
+  for (const m of [layoutModel, assembledModel]) if (m) { scene.remove(m); m.traverse(o => { o.geometry?.dispose(); o.material?.dispose(); }); }
+  layoutModel = lay; assembledModel = asm; scene.add(lay, asm);
+  makePlate(report.plate.side, report.plate.margin);
+  if (framedSide !== report.plate.side) { frame(report.plate.side); framedSide = report.plate.side; }  // keep the user's view otherwise
+  applyView();
+  renderReport(report);
+  $('dl3mf').href = `api/builds/${buildId}/fit_test.3mf`; $('dlzip').href = `api/builds/${buildId}/stl.zip`;
+  ['dl3mf', 'dlzip'].forEach(id => $(id).classList.toggle('off', !done));
+}
+const coupons = req => req.mode === 'rocket'
+  ? req.joints.length * req.clearances.length + (req.joints.length ? 1 : 0) + (req.thread ? 1 + req.thread_clearances.length : 0)
+  : req.sizes.length * (1 + req.lengths.length * req.clearances.length);
+// Seconds, roughly, on the hosted machine (a default M18 set: ~46 s).
+const estimate = req => req.mode === 'rocket'
+  ? 2 + 1.2 * req.joints.length * req.clearances.length + (req.thread ? 3 + 9 * req.thread_clearances.length : 0)
+  : 1 + 0.6 * coupons(req);
+
 $('form').onsubmit = async ev => {
   ev.preventDefault();
   const req = request();
@@ -742,38 +774,43 @@ $('form').onsubmit = async ev => {
   showErrors([]); save();
   const btn = $('build'); btn.disabled = true;
   ['dl3mf', 'dlzip'].forEach(id => $(id).classList.add('off'));
-  const k = req.mode === 'rocket' ? req.motors.length : 1;
-  const n = req.mode === 'rocket'
-    ? k * (req.joints.length * req.clearances.length + (req.joints.length ? 1 : 0) + (req.thread ? 1 + req.thread_clearances.length : 0))
-    : req.sizes.length * (1 + req.lengths.length * req.clearances.length);
-  const est = req.mode === 'rocket' ? 1 + k * (0.6 * req.joints.length * req.clearances.length + (req.thread ? 2 + 4 * req.thread_clearances.length : 0)) : 1 + 0.6 * n;
-  setStatus(`Building ${n} coupons…`); progressStart(est);
+  let built = [];
   try {
-    let res;
-    try { res = await fetch('api/build', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req) }); }
-    catch { throw new Error("Couldn't reach the server. Check your connection and press Build again; your settings are kept."); }
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const msg = body.error || (Array.isArray(body.detail) ? body.detail.map(d => `${d.loc.at(-1)}: ${d.msg}`).join('; ') : body.detail)
-        || (res.status >= 500 ? `The server had a problem (${res.status}). Try again in a minute; your settings are kept.` : res.statusText);
-      throw new Error(msg);
+    if (req.mode === 'rocket' && req.motors.length > 1) {
+      // One motor size per request, each added to the plate as it finishes: no
+      // request runs long, and sizes built before come back from the cache.
+      const skip = new Map(), seen = new Map();
+      for (const d of rdimsAll) {
+        const sig = [d.body_id, d.lengths.body, d.lengths.nose, d.bay_id, d.thread.pitch].join('|');
+        if (seen.has(sig)) skip.set(d.motor, seen.get(sig)); else seen.set(sig, d.motor);
+      }
+      const todo = req.motors.filter(m => !skip.has(m));
+      for (const [i, m] of todo.entries()) {
+        const one = { ...req, motors: [m], label_motor: true };
+        setStatus(`Building ${m} (${i + 1} of ${todo.length}): ${coupons(one)} coupons…`); progressStart(estimate(one));
+        let b;
+        try { b = await post('api/build', one); }
+        catch (e) { throw new Error(`${m}: ${e.message}${built.length ? ` The plate shows ${built.map(x => x.m).join(' and ')}.` : ''}`); }
+        built.push({ m, id: b.id });
+        progressEnd();
+        setStatus(i + 1 < todo.length ? `${m} built; adding it to the plate…` : 'Laying out the plate…');
+        const plate = await post('api/plate', { ids: built.map(x => x.id), plate: req.plate });
+        await show(plate, i + 1 === todo.length);
+      }
+      const notes = [...skip].map(([m, same]) => `${m} has the same joints and thread as ${same}, so it isn't repeated: use the ${same} coupons.`);
+      if (notes.length) { report.warnings.unshift(...notes); renderReport(report); }
+    } else {
+      setStatus(`Building ${coupons(req)} coupons…`); progressStart(estimate(req));
+      const body = await post('api/build', req);
+      setStatus('Loading the preview…');
+      await show(body);
     }
-    report = body.report; buildId = body.id; pinned = null;
-    setStatus('Loading the preview…');
-    const [lay, asm] = await Promise.all([loadGlb(`api/builds/${buildId}/plate.glb`), loadGlb(`api/builds/${buildId}/assembled.glb`)]);
-    for (const m of [layoutModel, assembledModel]) if (m) { scene.remove(m); m.traverse(o => { o.geometry?.dispose(); o.material?.dispose(); }); }
-    layoutModel = lay; assembledModel = asm; scene.add(lay, asm);
-    makePlate(report.plate.side, report.plate.margin);
-    if (framedSide !== report.plate.side) { frame(report.plate.side); framedSide = report.plate.side; }  // keep the user's view otherwise
-    applyView();
-    renderReport(report);
-    $('dl3mf').href = `api/builds/${buildId}/fit_test.3mf`; $('dlzip').href = `api/builds/${buildId}/stl.zip`;
-    ['dl3mf', 'dlzip'].forEach(id => $(id).classList.remove('off'));
     setStatus(`${report.count} coupons, ${report.plate.fits ? 'fits the plate' : "doesn't fit the plate"} · ${hintText}`);
   } catch (e) {
-    setStatus('Build failed: see the message under the form. Your settings are kept.');
+    const partial = built.length > 0;
+    setStatus(partial ? 'Stopped: see the message under the form. The plate shows the sizes that built.' : 'Build failed: see the message under the form. Your settings are kept.');
     showErrors([e.message || String(e)]);
-    $('report').innerHTML = `<div class="error"><b>Build failed.</b> ${esc(e.message || e)}</div>`;
+    if (!partial) $('report').innerHTML = `<div class="error"><b>Build failed.</b> ${esc(e.message || e)}</div>`;
   } finally {
     btn.disabled = false; progressEnd();
   }
