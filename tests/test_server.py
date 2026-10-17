@@ -115,3 +115,20 @@ def test_plate_combines_one_motor_builds():
     assert client.post("/api/plate", json={"ids": ["nope"]}).status_code == 404
     g = client.post("/api/build", json={"shape": "round", "sizes": [8], "clearances": [0.1], "lengths": [6]}).json()["id"]
     assert "Only Rocket Builder" in client.post("/api/plate", json={"ids": [a, g]}).json()["error"]
+
+
+def test_cached_builds_and_plates_answer_while_the_lock_is_held():
+    import server.app as srv
+    base = {"mode": "rocket", "joints": ["body"], "clearances": [0.2], "thread_clearances": [0.25], "label_motor": True}
+    a = client.post("/api/build", json={**base, "motors": ["M13"]}).json()["id"]
+    b = client.post("/api/build", json={**base, "motors": ["M18"]}).json()["id"]
+    old = srv.BUILD_WAIT_S
+    srv._lock.acquire()  # another build is running
+    try:
+        srv.BUILD_WAIT_S = 0.5
+        assert client.post("/api/build", json={**base, "motors": ["M13"]}).json()["id"] == a
+        assert client.post("/api/plate", json={"ids": [a, b]}).status_code == 200
+        assert client.post("/api/build", json={**base, "motors": ["M24"]}).status_code == 503  # a new one waits
+    finally:
+        srv.BUILD_WAIT_S = old
+        srv._lock.release()

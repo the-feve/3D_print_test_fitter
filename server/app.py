@@ -34,7 +34,7 @@ from fitgen.coupons import CORNERED, DEFAULT_CLEARANCES, DEFAULT_LENGTHS, DEFAUL
 from fitgen.plate import MARGIN
 
 STATIC = Path(__file__).parent / "static"
-CACHE_SIZE = 24  # one-motor rocket sets are cached one by one and combined into plates
+CACHE_SIZE = 16  # one-motor rocket sets are cached one by one and combined into plates; 1 GB machine
 PRINTERS = {"Bambu Lab X1C / P1S / A1": 256, "Bambu Lab A1 mini": 180}
 SOCKET_COLOR = (0.60, 0.63, 0.68)
 # pegs graded by clearance, tight (blue) to loose (orange)
@@ -45,6 +45,7 @@ app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 _builds: OrderedDict[str, dict] = OrderedDict()
 _lock = threading.Lock()  # one OpenCascade build at a time
+_plate_lock = threading.Lock()  # /api/plate: one combine at a time (no OpenCascade work)
 # Hosted in Rocket Builder's Fly app, which swaps in its own lock so the two
 # never build at once on the 1 GB machine. A visitor waits at most
 # BUILD_WAIT_S for their turn, and each address gets a budget of new
@@ -138,22 +139,35 @@ def _colors(items) -> dict[str, list[float]]:
     return out
 
 
-def _mesh(solid) -> trimesh.Trimesh:
-    verts, tris = solid.tessellate(0.02, 0.2)
-    return trimesh.Trimesh(np.array([(v.X, v.Y, v.Z) for v in verts]), np.array(tris), process=False)
+def _arrays(c, which: str) -> tuple[np.ndarray, np.ndarray]:
+    """A coupon's preview mesh (vertices, triangles), tessellated once and
+    kept on the coupon: "print" (as printed, at the origin) or "seated"."""
+    cache = c.__dict__.setdefault("_meshes", {})
+    if which not in cache:
+        solid = c.print_solid if which == "print" else c.seated
+        verts, tris = solid.tessellate(0.02, 0.2)
+        cache[which] = (np.array([(v.X, v.Y, v.Z) for v in verts]), np.array(tris))
+    return cache[which]
+
+
+def _mesh(c, which: str, x: float, y: float) -> trimesh.Trimesh:
+    v, t = _arrays(c, which)
+    return trimesh.Trimesh(v + (x, y, 0.0), t, process=False)
 
 
 def _glbs(plate) -> tuple[bytes, bytes]:
-    """The plate layout, and each peg seated in a copy of its socket at the peg's place."""
+    """The plate layout, and each peg seated in a copy of its socket at the
+    peg's place. Meshes come from the coupons' caches, so laying out a plate
+    of sets already built (/api/plate) needs no OpenCascade work."""
     flat, assembled = trimesh.Scene(), trimesh.Scene()
     sockets = {p.coupon.name: p.coupon for p in plate.placed if p.coupon.role == "socket"}
     for p in plate.placed:
         c = p.coupon
-        flat.add_geometry(_mesh(p.solid), node_name=c.name, geom_name=c.name)
+        flat.add_geometry(_mesh(c, "print", p.x, p.y), node_name=c.name, geom_name=c.name)
         if c.role == "peg":
-            assembled.add_geometry(_mesh(c.seated.translate((p.x, p.y, 0))), node_name=c.name, geom_name=c.name)
-            sock = sockets[c.socket].print_solid.translate((p.x, p.y, 0))
-            assembled.add_geometry(_mesh(sock), node_name=f"{c.name}::socket", geom_name=f"{c.name}::socket")
+            assembled.add_geometry(_mesh(c, "seated", p.x, p.y), node_name=c.name, geom_name=c.name)
+            assembled.add_geometry(_mesh(sockets[c.socket], "print", p.x, p.y),
+                                   node_name=f"{c.name}::socket", geom_name=f"{c.name}::socket")
     return flat.export(file_type="glb"), assembled.export(file_type="glb")
 
 
@@ -233,8 +247,10 @@ def build_set(req: BuildRequest, request: Request):
     except TypeError as e:
         raise HTTPException(422, str(e))
     key = _key(p)
-    if key not in _builds:
-        _rate_limit(request)
+    if key in _builds:  # cached: answer straight away, even while another build holds the lock
+        _builds.move_to_end(key)
+        return {"id": key, "report": _builds[key]["report"]}
+    _rate_limit(request)
     with _turn():
         if key not in _builds:
             try:
@@ -267,7 +283,9 @@ def combine(req: PlateRequest):
     out together on one plate, so no single request has to build them all.
     Answers like /api/build; the downloads work on the returned id."""
     key = "plate-" + hashlib.sha256(json.dumps([GENERATOR_VERSION, req.ids, req.plate]).encode()).hexdigest()[:16]
-    with _turn():
+    # No build lock: the sets are built, and their preview meshes are cached
+    # on the coupons (_arrays), so this is layout and GLB export only.
+    with _plate_lock:
         if key not in _builds:
             parts = [_get(i) for i in req.ids]
             ps = [b["p"] for b in parts]

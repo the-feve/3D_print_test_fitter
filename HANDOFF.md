@@ -49,6 +49,8 @@ Don't link it from quiverdesignworks.net or the builders until the owner says so
 
 ## Gotchas
 
+- **Hosted builds slow down badly after a few (2026-10-17, cause not confirmed).** On the Fly machine the first rocket sets took ~46–50 s (about 2× local), then a new M24 set ran for over 5 minutes on an idle machine and `/healthz` stopped answering for minutes, Rocket Builder included. Most likely Fly's CPU quota on shared CPUs (full speed only in bursts, then throttled); possibly memory on the 1 GB machine. Check the app's CPU / throttling graphs on the Fly dashboard. Mitigations so far: cached sets and plates answer without the build lock, preview meshes are tessellated once per coupon and reused, cache cut to 16 sets. A client that gives up doesn't stop its build: it keeps the lock until it finishes.
+
 - **OpenCascade can silently return an empty intersection of two whole threaded solids** (the M24 boss and a cap: zero overlap even when the cap is pushed 1 mm into the boss, though `distance_to` says 0). Intersected with a thin slab through the axis first, the result is right. `tests/test_rocket.py` checks the thread seating on slices.
 - **Import map addresses must start with `./`, `../` or `/`.** A bare `static/...` is ignored, three.js never loads and Build falls back to a plain form submit that reloads the page and clears the form (live on 2026-10-17 for an hour). The form has `onsubmit="return false"` as a backstop, and a test checks the import map.
 - **Cut labels last.** Booleans pay for the text's many faces: cut into a motor cap's plain cup first, the label made the thread union four times slower.
