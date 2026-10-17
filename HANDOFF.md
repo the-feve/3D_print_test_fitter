@@ -1,6 +1,6 @@
 # Handoff
 
-_Last updated 2026-10-17._
+_Last updated 2026-10-17 (two tabs, polygons, thread coupons)._
 
 ## State
 
@@ -9,6 +9,8 @@ Milestones 1 and 2 of `docs/spec.md` are done and run locally; nothing is deploy
 - **`fitgen/`** (build123d): round peg / hole, square peg / hole, and the tube shoulder / socket ported from rocket-builder-web `geometry/rocketgen/fit_test.py`. Clearance list (radial), engagement lengths (grid with clearances), sizes, wall, 45° insertion-end chamfer, seat (tube: countersink or flat), square corner radius, vent hole, orientation (flat face down or insertion end down), plate size. Labels recessed 0.6 mm into the bed face with the bundled FreeSans Bold. Layout packs rows centred on the plate inside an 8 mm margin and reports whether it fits. 3MF via `Mesher` (one named object per coupon) and one STL per coupon. CLI: `python -m fitgen`.
 - **`server/`** FastAPI + the page: form left, three.js view right (Rocket Builder's set-up, lights and theme tokens), build plate with 10 mm grid / margin / origin marker, coupons coloured by role (sockets grey, pegs blue → orange from tight to loose), hover or click for a coupon's name and clearance, Assembled and Section toggles, coupon table, plate usage, grams, judging guide, 3MF and STL ZIP downloads. Builds are cached in memory by a hash of the params plus `GENERATOR_VERSION`.
 - **Tests** (`python -m pytest -q`, ~40 s): one sound solid per coupon (valid + tessellates), seating (no overlap at the seat, overlap 0.05 mm further in; lifted 1 mm, sideways by just under the clearance clears and just over doesn't), every placed coupon on z = 0 and inside the plate with no overlapping footprints, the 3MF has one named object per coupon with every vertex on the plate, the flat print puts the label face on the bed, labels read the right way from below, bad parameters give a plain message, API build / previews / downloads.
+
+- **Two tabs (2026-10-17, owner's request):** *Rocket Builder* and *General* at the top of the form (`#rocket` / `#general` in the URL; the last one used is remembered). General adds **pentagon, hexagon, octagon** (`coupons.py`: size = across flats, rounded inside corners, peg = hole offset inward by the clearance, round head, a flat facing the label tab at +Y). Rocket Builder takes the motor, wall and body OD offset (Rocket Builder's Body inputs) and builds the **body joint** and/or **nose joint** (tube coupons with Rocket Builder's bore, shoulder lengths and countersink seat; `fitgen/rocket.py`) and the **motor retention thread** (`fitgen/thread.py`: boss on a 3 mm flange, a cap per thread clearance, default 0.15–0.35 mm; Rocket Builder prints 0.25). The default M18 set (6 joint pegs + boss + 5 caps) builds in about 23 s. The page saves its inputs in localStorage (`fit-test-builder:v2`), checks them before a build (bad fields outlined, message above Build), shows server errors in the same place and never clears the form. `GENERATOR_VERSION` 0.2.0.
 
 ## Next steps
 
@@ -47,12 +49,17 @@ Don't link it from quiverdesignworks.net or the builders until the owner says so
 
 ## Gotchas
 
+- **OpenCascade can silently return an empty intersection of two whole threaded solids** (the M24 boss and a cap: zero overlap even when the cap is pushed 1 mm into the boss, though `distance_to` says 0). Intersected with a thin slab through the axis first, the result is right. `tests/test_rocket.py` checks the thread seating on slices.
+- **Import map addresses must start with `./`, `../` or `/`.** A bare `static/...` is ignored, three.js never loads and Build falls back to a plain form submit that reloads the page and clears the form (live on 2026-10-17 for an hour). The form has `onsubmit="return false"` as a backstop, and a test checks the import map.
+- **Cut labels last.** Booleans pay for the text's many faces: cut into a motor cap's plain cup first, the label made the thread union four times slower.
+
 - GLTFLoader strips `.` and `:` from node names (`D18.4` → `D184`); the page uses `userData.name`, which keeps the original.
 - The page's form has `novalidate`: the browser's step check (e.g. a 0.01 step with min 0.001) silently blocked submits. The server validates.
 - Tests in a Claude cloud container: `pip install -e ".[server,test]"` into a venv (build123d isn't preinstalled). For screenshots use Playwright with `executable_path` set to the preinstalled Chromium under `/opt/pw-browsers/` and `--use-gl=swiftshader`.
 
 ## Log
 
+- 2026-10-17: Rocket Builder / General tabs, polygons, motor-thread coupons, saved inputs and field errors. Fixed the import map (the page didn't load three.js under /fit/ or fit.*).
 - 2026-10-17: live at fit.quiverdesignworks.net (unlisted).
 - 2026-10-17: `main` created; hosting made unlisted (noindex) instead of admin-only, per the owner's 2026-10-16 choice.
 - 2026-10-16: hosting code: relative page URLs, per-address build limit, bounded lock wait, lock shared with the host; the mount and admin gate in rocket-builder-web. Fly / Cloudflare tokens not available in the session.

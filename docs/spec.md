@@ -26,7 +26,9 @@ Owner: Matthew Fevergeon (Quiver Design Works LLC). Printers: Bambu Lab **X1C** 
 1. **Round peg / round hole** (cylinder in a bore). Inputs: nominal diameter, engagement length, wall.
 2. **Tube shoulder / socket** (the rocket joint): hollow shoulder into a tube bore, optional 45° countersink seat on the socket and matching rise on the peg. Port this one directly from `fit_test.py`.
 3. **Square / rectangular peg** (corner radius option: sharp inside corners print tight).
-4. Later: hex (nut traps), D-shaft, dovetail slide, press-fit pin, snap-fit hook, thread (pitch × clearance).
+4. **Regular polygons** (2026-10-17): pentagon, hexagon (nut traps), octagon; size = across flats, built like the square.
+5. **Rocket Builder tab** (2026-10-17, owner's request): the body joint, nose joint and motor-retention thread, sized from Rocket Builder's motor / wall / body OD offset inputs (`fitgen/rocket.py`, `fitgen/thread.py`).
+6. Later: D-shaft, dovetail slide, press-fit pin, snap-fit hook, generic thread (pitch × clearance).
 
 ### Variables
 - **Clearance range:** start, step and count (e.g. 0.05 → 0.30 in 0.05), or a typed list. Radial, mm.

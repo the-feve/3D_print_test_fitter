@@ -1,0 +1,7 @@
+Name,Type,Value,Description
+print_h,Length,200 mm,Printer Z height
+z_margin,Length,5 mm,Z safety margin
+wall,Length,1.5 mm,Shell and tube wall
+fit_slip,Length,0.02 mm,Shoulder into socket (radial)
+fit_press,Length,0.1 mm,Glued joints (radial)
+mtr_clear,Length,0.2 mm,Motor in printed bore (radial)

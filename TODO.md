@@ -12,6 +12,11 @@ Milestones are from `docs/spec.md`. Done items move to HANDOFF.md's log.
 - [ ] Save / load parameter presets in the browser.
 - [ ] Split a set that doesn't fit across plates (one 3MF per plate) instead of only warning.
 
+## Rocket Builder tab
+- [ ] Owner: Rocket Builder Advanced inputs for the critical fit dimensions (joint clearance, shoulder lengths, thread clearance / pitch) so a result from here can be typed in there (rocket-builder-web; asked 2026-10-17).
+- [ ] Optional: motor-in-bay coupons (rings at a few clearances to try a real motor in; Rocket Builder uses 0.2 mm, `mtr_clear`).
+- [ ] Optional: print the thread boss tail-down like the real aft (now flange down).
+
 ## Shape options not built yet
 - [ ] Lead-in chamfer at the socket mouth.
 - [ ] Countersink seat on round pegs (now flat stop only); flat-stop variants are there for tube.
@@ -28,5 +33,5 @@ Milestones are from `docs/spec.md`. Done items move to HANDOFF.md's log.
 - [ ] Links from quiverdesignworks.net and the builders' switcher (`nav.apps`) — only once the owner says it's ready.
 
 ## Milestone 5: later shapes
-- [ ] Hex (nut traps), D-shaft, dovetail slide, press-fit pin, snap-fit hook, thread (pitch × clearance).
+- [ ] D-shaft, dovetail slide, press-fit pin, snap-fit hook, generic thread (pitch × clearance). (Hex, pentagon, octagon done 2026-10-17.)
 - [ ] Let Rocket Builder import a result ("use 0.18 mm for joints").

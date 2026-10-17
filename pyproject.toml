@@ -20,7 +20,7 @@ build-backend = "setuptools.build_meta"
 packages = ["fitgen"]
 
 [tool.setuptools.package-data]
-fitgen = ["fonts/*"]
+fitgen = ["fonts/*", "data/*.csv"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

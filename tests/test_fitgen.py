@@ -15,6 +15,9 @@ from fitgen.geom import as_shape, box, meshes, overlap_volume, revolve, solids_o
 CASES = {
     "round": FitParams.for_shape("round", sizes=(8.0, 13.0), clearances=(0.05,), lengths=(7.0, 10.0)),
     "square": FitParams.for_shape("square", sizes=(10.0,), clearances=(0.1, 1.2), lengths=(8.0,)),
+    "pentagon": FitParams.for_shape("pentagon", sizes=(12.0,), clearances=(0.1, 1.2), lengths=(8.0,)),
+    "hexagon": FitParams.for_shape("hexagon", sizes=(10.0,), clearances=(0.15,), lengths=(6.0,), corner_radius=0.0),
+    "octagon": FitParams.for_shape("octagon", sizes=(14.0,), clearances=(0.2,), lengths=(8.0,), orientation="functional"),
     "tube": FitParams.for_shape("tube", sizes=(13.4,), clearances=(0.05, 0.3), lengths=(7.0,)),
     "tube_flat": FitParams.for_shape("tube", sizes=(18.4,), clearances=(0.15,), lengths=(12.0,), seat="flat",
                                      orientation="functional", chamfer=0.0),
@@ -43,7 +46,9 @@ def test_every_coupon_is_one_sound_solid(case):
 def test_pegs_seat_without_overlap(case):
     """Seated, a peg doesn't touch its socket; 0.05 mm further in it does (it
     seats on the stop / countersink). Lifted 1 mm off the seat, it can move
-    sideways by just under its clearance, and not by just over it."""
+    sideways by just under its clearance, and not by just over it. Sideways
+    is +Y: every shape has a flat facing +Y (a polygon's gap across a corner
+    is wider than its clearance)."""
     items = coupons(case)
     sockets = {c.name: c.print_solid for c in items if c.role == "socket"}
     for c in items:
@@ -53,8 +58,8 @@ def test_pegs_seat_without_overlap(case):
         assert overlap_volume(sock, peg) < 1e-3, c.name
         assert overlap_volume(sock, peg.translate((0, 0, -0.05))) > 0.3, c.name
         lifted = peg.translate((0, 0, 1.0))
-        assert overlap_volume(sock, lifted.translate((c.clearance - 0.02, 0, 0))) < 1e-3, c.name
-        assert overlap_volume(sock, lifted.translate((c.clearance + 0.03, 0, 0))) > 1e-3, c.name
+        assert overlap_volume(sock, lifted.translate((0, c.clearance - 0.02, 0))) < 1e-3, c.name
+        assert overlap_volume(sock, lifted.translate((0, c.clearance + 0.03, 0))) > 1e-3, c.name
 
 
 @pytest.mark.parametrize("case", CASES)
@@ -139,7 +144,8 @@ def test_clearance_codes():
 @pytest.mark.parametrize("kw, msg", [
     (dict(shape="tube", sizes=(5.0,)), "too small"),
     (dict(clearances=(0.15, 0.1504)), "differ"),
-    (dict(shape="hex"), "Unknown shape"),
+    (dict(shape="triangle"), "Unknown shape"),
+    (dict(shape="hexagon", corner_radius=3.0), "quarter"),
     (dict(sizes=(10.0,), clearances=tuple(0.01 * i for i in range(20)), lengths=(5.0, 7.0, 10.0, 12.0)), "60 or fewer"),
     (dict(lengths=(1.0,)), "out of range"),
 ])

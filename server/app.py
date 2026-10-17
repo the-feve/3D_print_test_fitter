@@ -28,8 +28,8 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from fitgen import GENERATOR_VERSION, FitParams, GeometryError, build, layout, stl_zip, write_3mf
-from fitgen.coupons import DEFAULT_CLEARANCES, DEFAULT_LENGTHS, DEFAULT_SIZES, DEFAULT_WALL, code
+from fitgen import GENERATOR_VERSION, SHAPES, FitParams, GeometryError, build, layout, rocket, stl_zip, write_3mf
+from fitgen.coupons import CORNERED, DEFAULT_CLEARANCES, DEFAULT_LENGTHS, DEFAULT_SIZES, DEFAULT_WALL, SIDES, code
 from fitgen.plate import MARGIN
 
 STATIC = Path(__file__).parent / "static"
@@ -80,7 +80,10 @@ def _turn():
 
 
 class BuildRequest(BaseModel):
-    shape: Literal["round", "square", "tube"] = "round"
+    # "general": any shape; "rocket": Rocket Builder's joints and motor thread,
+    # sized from the motor, wall and body OD offset (fitgen/rocket.py).
+    mode: Literal["general", "rocket"] = "general"
+    shape: Literal[SHAPES] = "round"
     sizes: list[float] = Field(default_factory=lambda: [10.0], max_length=6)
     clearances: list[float] = Field(default_factory=lambda: list(DEFAULT_CLEARANCES), max_length=20)
     lengths: list[float] = Field(default_factory=lambda: [10.0], max_length=5)
@@ -91,12 +94,29 @@ class BuildRequest(BaseModel):
     orientation: Literal["flat", "functional"] = "flat"
     vent: bool = True
     plate: float = 256.0
+    # rocket mode
+    motor: str = "M18"
+    body_offset: float = 0.0
+    joints: list[Literal["body", "nose"]] = Field(default_factory=lambda: ["body"], max_length=2)
+    thread: bool = True
+    thread_clearances: list[float] = Field(default_factory=lambda: list(rocket.DEFAULT_THREAD_CLEARANCES), max_length=12)
 
-    def params(self) -> FitParams:
+    def params(self) -> "FitParams | rocket.RocketParams":
         d = self.model_dump()
-        for k in ("sizes", "clearances", "lengths"):
+        for k in ("sizes", "clearances", "lengths", "thread_clearances"):
             d[k] = tuple(round(float(v), 4) for v in d[k])
+        if self.mode == "rocket":
+            return rocket.RocketParams(motor=self.motor, wall=self.wall, offset=self.body_offset,
+                                       joints=tuple(self.joints), clearances=d["clearances"], thread=self.thread,
+                                       thread_clearances=d["thread_clearances"], chamfer=self.chamfer, seat=self.seat,
+                                       orientation=self.orientation, plate=self.plate)
+        for k in ("mode", "motor", "body_offset", "joints", "thread", "thread_clearances"):
+            d.pop(k)
         return FitParams(**d)
+
+
+def _build(p) -> tuple[list, list[str]]:
+    return rocket.build(p) if isinstance(p, rocket.RocketParams) else build(p)
 
 
 def _key(p: FitParams) -> str:
@@ -134,7 +154,7 @@ def _glbs(plate) -> tuple[bytes, bytes]:
     return flat.export(file_type="glb"), assembled.export(file_type="glb")
 
 
-def _report(p: FitParams, plate, notes: list[str]) -> dict:
+def _report(p, plate, notes: list[str]) -> dict:
     colors = _colors([q.coupon for q in plate.placed])
     rows = []
     for q in plate.placed:
@@ -151,8 +171,11 @@ def _report(p: FitParams, plate, notes: list[str]) -> dict:
         warnings.append(f"The layout is {plate.width:.0f} × {plate.depth:.0f} mm and doesn't fit inside a "
                         f"{p.plate:g} mm plate with a {MARGIN:g} mm margin. Use fewer clearances, lengths or sizes, "
                         "or a bigger plate.")
+    extra = {"rocket": rocket.dims(p.motor, p.wall, p.offset)} if isinstance(p, rocket.RocketParams) else {}
     return {
         "generator_version": GENERATOR_VERSION,
+        "mode": "rocket" if extra else "general",
+        **extra,
         "params": p.to_dict(),
         "coupons": rows,
         "count": len(rows),
@@ -180,11 +203,24 @@ def index():
 def options():
     return {
         "generator_version": GENERATOR_VERSION,
-        "shapes": {s: {"sizes": list(DEFAULT_SIZES[s]), "lengths": list(DEFAULT_LENGTHS[s]), "wall": DEFAULT_WALL[s]}
-                   for s in DEFAULT_WALL},
+        "shapes": {s: {"sizes": list(DEFAULT_SIZES[s]), "lengths": list(DEFAULT_LENGTHS[s]), "wall": DEFAULT_WALL[s],
+                       "cornered": s in CORNERED, "sides": SIDES.get(s)}
+                   for s in SHAPES},
+        "rocket": {"motors": list(rocket.motors()), "default_motor": "M18", "joints": list(rocket.JOINTS),
+                   "thread_clearances": list(rocket.DEFAULT_THREAD_CLEARANCES),
+                   "dims": {m: rocket.dims(m) for m in rocket.motors()}},
         "clearances": list(DEFAULT_CLEARANCES),
         "printers": PRINTERS,
     }
+
+
+@app.get("/api/rocket")
+def rocket_dims(motor: str = "M18", wall: float | None = None, offset: float = 0.0):
+    """The joint and thread numbers for a rocket, for the page's hints (no geometry)."""
+    try:
+        return rocket.dims(motor, wall, offset)
+    except GeometryError as e:
+        return JSONResponse({"error": str(e)}, status_code=422)
 
 
 @app.post("/api/build")
@@ -199,7 +235,7 @@ def build_set(req: BuildRequest, request: Request):
     with _turn():
         if key not in _builds:
             try:
-                items, notes = build(p)
+                items, notes = _build(p)
             except GeometryError as e:
                 return JSONResponse({"error": str(e)}, status_code=422)
             plate = layout(items, p.plate)
@@ -223,7 +259,8 @@ def assembled_glb(build_id: str):
 
 
 def _name(b: dict) -> str:
-    return f"fit_test_{b['report']['params']['shape']}"
+    pr = b["report"]["params"]
+    return f"fit_test_rocket_{pr['motor']}" if b["report"]["mode"] == "rocket" else f"fit_test_{pr['shape']}"
 
 
 @app.get("/api/builds/{build_id}/fit_test.3mf")

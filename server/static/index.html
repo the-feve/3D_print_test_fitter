@@ -68,6 +68,12 @@
   .seg button { flex:1; padding:5px 8px; border:0; border-radius:0; font:600 12px system-ui; color:var(--muted); background:transparent; cursor:pointer; }
   .seg button[aria-pressed=true] { color:var(--accent-ink); background:var(--accent); }
   [hidden] { display:none !important; }
+  .modes { margin:4px 0 0; }
+  .modes button { padding:8px; font-size:13px; }
+  [aria-invalid=true] { border-color:var(--err) !important; background:var(--errbg) !important; }
+  #formerr { flex:1 1 100%; margin:0; color:var(--err); background:var(--errbg); border:1px solid var(--errline); padding:7px 9px; border-radius:6px; font-size:12.5px; }
+  #formerr ul { margin:2px 0 0; padding-left:16px; }
+  .linkbtn { flex:1 1 100%; text-align:center; padding:2px 0 0; border:0; background:none; color:var(--muted); font:500 12px system-ui; text-decoration:underline; cursor:pointer; }
   .actions { position:sticky; bottom:-16px; background:var(--panel); padding:10px 0 6px; display:flex; flex-wrap:wrap; gap:8px; border-top:1px solid var(--line); margin-top:12px; }
   button, a.btn { flex:1; padding:9px 12px; border-radius:6px; border:1px solid transparent; font:600 14px system-ui, -apple-system, sans-serif; cursor:pointer; text-align:center; text-decoration:none; }
   #build { flex:1 1 100%; background:var(--ink); color:var(--bg); }
@@ -129,19 +135,39 @@
 <header><h1>Fit Test Builder</h1><nav><a href="https://quiverdesignworks.net/">← Quiver Design Works</a></nav><span class="units">Beta · units mm · clearances radial (per side)</span><button id="theme" type="button"></button></header>
 <main>
   <form id="form" autocomplete="off" novalidate onsubmit="return false">
-    <fieldset>
+    <div class="seg modes" role="tablist" aria-label="Builder">
+      <button type="button" id="mode-rocket" role="tab" aria-pressed="false">Rocket Builder</button>
+      <button type="button" id="mode-general" role="tab" aria-pressed="true">General</button>
+    </div>
+    <p class="hint" id="modehint"></p>
+    <fieldset class="rocket-only">
+      <legend>Rocket</legend>
+      <label>Motor size <select id="motor"></select></label>
+      <label>Wall thickness, mm<input type="number" id="rwall" step="0.1" min="0.8" max="3" value="1.5"></label>
+      <label>Body OD offset, mm<input type="number" id="roffset" step="0.1" min="0" max="80" value="0"></label>
+      <p class="hint">The same three inputs as Rocket Builder's Body section: they set the tube bore and the joint lengths.</p>
+      <p class="hint" id="rdims"></p>
+      <label class="check"><span>Body joint <span id="jbodylen" class="hint"></span></span><input type="checkbox" id="jbody" checked></label>
+      <label class="check"><span>Nose joint <span id="jnoselen" class="hint"></span></span><input type="checkbox" id="jnose"></label>
+      <label class="check"><span>Motor retention thread <span id="jthreadlen" class="hint"></span></span><input type="checkbox" id="jthread" checked></label>
+      <label class="joints-only">Joint seat <select id="rseat"><option value="countersink">45° countersink (Rocket Builder)</option><option value="flat">Flat stop</option></select></label>
+    </fieldset>
+    <fieldset class="general-only">
       <legend>Shape</legend>
       <label class="wide">Coupon <select id="shape">
-        <option value="round">Round peg / hole</option>
-        <option value="square">Square peg / hole</option>
+        <option value="round">Cylinder (round peg / hole)</option>
+        <option value="square">Square</option>
+        <option value="pentagon">Pentagon</option>
+        <option value="hexagon">Hexagon</option>
+        <option value="octagon">Octagon</option>
         <option value="tube">Tube shoulder / socket</option>
       </select></label>
       <p class="hint" id="shapehint"></p>
       <label class="wide"><span id="sizelabel">Sizes, mm</span><input type="text" id="sizes" inputmode="decimal"></label>
       <p class="hint">One socket per size. Separate several with commas, e.g. 13, 18, 24.</p>
     </fieldset>
-    <fieldset>
-      <legend>Clearance (radial, per side)</legend>
+    <fieldset id="jointclear">
+      <legend id="clegend">Clearance (radial, per side)</legend>
       <div class="seg" role="group" aria-label="Clearance input">
         <button type="button" id="cmode-range" aria-pressed="true">Range</button>
         <button type="button" id="cmode-list" aria-pressed="false">List</button>
@@ -154,18 +180,27 @@
       <label class="wide" id="clist" hidden><span>Clearances, mm</span><input type="text" id="clearances" inputmode="decimal" value="0.1, 0.15, 0.18, 0.2"></label>
       <p class="hint" id="chint"></p>
     </fieldset>
+    <fieldset class="rocket-only thread-only">
+      <legend>Thread clearance (radial)</legend>
+      <div class="row3">
+        <label>Start, mm<input type="number" id="tstart" step="0.01" min="0.05" max="1" value="0.15"></label>
+        <label>Step, mm<input type="number" id="tstep" step="0.01" min="0.01" max="0.5" value="0.05"></label>
+        <label>Count<input type="number" id="tcount" step="1" min="1" max="12" value="5"></label>
+      </div>
+      <p class="hint" id="thint"></p>
+    </fieldset>
     <fieldset>
       <legend>Peg</legend>
-      <label class="wide"><span>Engagement lengths, mm</span><input type="text" id="lengths" inputmode="decimal"></label>
-      <p class="hint">A shorter peg feels looser at the same clearance. Give two or three lengths to test that too.</p>
-      <label><span id="walllabel">Wall, mm</span><input type="number" id="wall" step="0.1" min="0.8" max="10"></label>
-      <label class="tube-only">Seat <select id="seat"><option value="countersink">45° countersink</option><option value="flat">Flat stop</option></select></label>
-      <label class="square-only">Socket corner radius, mm<input type="number" id="corner" step="0.1" min="0" value="1.0"></label>
-      <p class="hint square-only">Sharp inside corners print tight; the peg's corners follow the socket's, offset by the clearance.</p>
+      <label class="wide general-only"><span>Engagement lengths, mm</span><input type="text" id="lengths" inputmode="decimal"></label>
+      <p class="hint general-only">A shorter peg feels looser at the same clearance. Give two or three lengths to test that too.</p>
+      <label class="general-only"><span id="walllabel">Wall, mm</span><input type="number" id="wall" step="0.1" min="0.8" max="10"></label>
+      <label class="general-only tube-only">Seat <select id="seat"><option value="countersink">45° countersink</option><option value="flat">Flat stop</option></select></label>
+      <label class="general-only cornered">Socket corner radius, mm<input type="number" id="corner" step="0.1" min="0" value="1.0"></label>
+      <p class="hint general-only cornered">Sharp inside corners print tight; the peg's corners follow the socket's, offset by the clearance.</p>
       <label class="check">Chamfer the peg's insertion end <input type="checkbox" id="chamferon" checked></label>
       <label>Chamfer size, mm<input type="number" id="chamfer" step="0.1" min="0.1" max="2" value="0.5"></label>
       <p class="hint">45°. Takes off the elephant foot when the peg prints that end down, and gives a lead-in.</p>
-      <label class="check not-tube">Vent hole in the socket floor <input type="checkbox" id="vent" checked></label>
+      <label class="check general-only not-tube">Vent hole in the socket floor <input type="checkbox" id="vent" checked></label>
     </fieldset>
     <fieldset>
       <legend>Printing</legend>
@@ -178,9 +213,11 @@
       <label>Plate size, mm<input type="number" id="plate" step="1" min="60" max="500" value="256"></label>
     </fieldset>
     <div class="actions">
+      <div id="formerr" role="alert" hidden></div>
       <button id="build" type="submit">Build</button>
       <a id="dl3mf" class="btn off" href="#" download>3MF plate</a>
       <a id="dlzip" class="btn off" href="#" download>STLs (ZIP)</a>
+      <button type="button" id="reset" class="linkbtn">Reset this tab to defaults</button>
     </div>
   </form>
   <section id="right">
@@ -202,15 +239,22 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const $ = id => document.getElementById(id);
+const POLY = n => ({ hint: `A regular ${n}-sided peg with a head in a blind ${n}-sided socket. Size is across flats; a flat faces the label tab.`, size: 'Across flats, mm', wall: 'Socket wall, mm' });
 const SHAPE_TEXT = {
   round: { hint: 'A solid round peg with a head (the stop) in a blind round socket.', size: 'Hole diameters, mm', wall: 'Socket wall, mm' },
   square: { hint: 'A square peg with a head in a blind square socket.', size: 'Hole sides, mm', wall: 'Socket wall, mm' },
+  pentagon: POLY(5), hexagon: { ...POLY(6), hint: 'A hexagonal peg in a blind hex socket (a nut trap test). Size is across flats, like a nut or wrench size.' }, octagon: POLY(8),
   tube: { hint: 'A hollow shoulder into a tube bore, like a rocket body joint, seated on a countersink or a flat stop.', size: 'Tube bores (ID), mm', wall: 'Tube wall, mm' },
 };
-let options = null;
+const MODE_TEXT = {
+  rocket: 'Test the fits Rocket Builder prints: the body and nose joints and the threaded motor cap, sized from your rocket\'s motor, wall and body OD offset.',
+  general: 'Peg-and-socket coupons for any fit: pick a shape, sizes and a range of clearances.',
+};
+let options = null, mode = 'general';
 
 // ---------- form ----------
 const nums = s => s.split(/[,;\s]+/).map(x => x.trim()).filter(Boolean).map(Number);
+const fmt = c => c.toFixed(c * 100 % 1 ? 3 : 2);
 let cmode = 'range';
 function setCmode(m) {
   cmode = m;
@@ -219,40 +263,92 @@ function setCmode(m) {
   $('crange').hidden = m !== 'range'; $('clist').hidden = m !== 'list';
   clearanceHint();
 }
-$('cmode-range').onclick = () => setCmode('range');
-$('cmode-list').onclick = () => setCmode('list');
+$('cmode-range').onclick = () => { setCmode('range'); save(); };
+$('cmode-list').onclick = () => { setCmode('list'); save(); };
+const range = (s, st, n, max) => Array.from({ length: Math.max(1, Math.min(max, Math.round(n))) }, (_, i) => Math.round((s + i * st) * 1e4) / 1e4);
 function clearances() {
   if (cmode === 'list') return nums($('clearances').value);
-  const s = +$('cstart').value, st = +$('cstep').value, n = Math.max(1, Math.min(20, Math.round(+$('ccount').value)));
-  return Array.from({ length: n }, (_, i) => Math.round((s + i * st) * 1e4) / 1e4);
+  return range(+$('cstart').value, +$('cstep').value, +$('ccount').value, 20);
 }
+const threadClearances = () => range(+$('tstart').value, +$('tstep').value, +$('tcount').value, 12);
 function clearanceHint() {
   const cs = clearances();
   const ok = cs.length && cs.every(c => Number.isFinite(c));
+  const advice = mode === 'rocket'
+    ? `Rocket Builder now builds its joints at ${rdims?.fit_slip ?? 0.02} mm; round 1 on a P1S in PLA found 0.15–0.20 right.`
+    : 'On a Bambu P1S in PLA, 0.15–0.20 was right for a glued slip fit.';
   $('chint').textContent = ok
-    ? `${cs.map(c => c.toFixed(c * 100 % 1 ? 3 : 2)).join(', ')} mm per side (diameter gap ${cs.map(c => +(2 * c).toFixed(3)).join(', ')} mm). Labels are in hundredths: C15 = 0.15 mm. On a Bambu P1S in PLA, 0.15–0.20 was right for a glued slip fit.`
+    ? `${cs.map(fmt).join(', ')} mm per side (diameter gap ${cs.map(c => +(2 * c).toFixed(3)).join(', ')} mm). Labels are in hundredths: C15 = 0.15 mm. ${advice}`
+    : 'Enter numbers in mm.';
+  const ts = threadClearances(), t = rdims?.thread;
+  $('thint').textContent = ts.every(Number.isFinite)
+    ? `${ts.map(fmt).join(', ')} mm, crest to cap bore. Caps are labelled T25 = 0.25 mm. Rocket Builder prints its caps at ${t ? t.clearance : 0.25} mm.`
     : 'Enter numbers in mm.';
 }
-['cstart', 'cstep', 'ccount', 'clearances'].forEach(id => $(id).addEventListener('input', clearanceHint));
+['cstart', 'cstep', 'ccount', 'clearances', 'tstart', 'tstep', 'tcount'].forEach(id => $(id).addEventListener('input', clearanceHint));
 
-function shapeChanged(resetDefaults) {
-  const s = $('shape').value, t = SHAPE_TEXT[s];
+function setMode(m, fromHash) {
+  mode = m === 'rocket' ? 'rocket' : 'general';
+  for (const k of ['rocket', 'general']) $(`mode-${k}`).setAttribute('aria-pressed', k === mode);
+  $('modehint').textContent = MODE_TEXT[mode];
+  if (!fromHash && location.hash !== `#${mode}`) history.replaceState(null, '', `#${mode}`);
+  refresh();
+}
+$('mode-rocket').onclick = () => { setMode('rocket'); save(); };
+$('mode-general').onclick = () => { setMode('general'); save(); };
+addEventListener('hashchange', () => setMode(location.hash.slice(1), true));
+
+// Show what applies to this tab, shape and choice of rocket coupons.
+function refresh() {
+  const s = $('shape').value, t = SHAPE_TEXT[s], rk = mode === 'rocket';
+  const joints = $('jbody').checked || $('jnose').checked, thr = $('jthread').checked;
   $('shapehint').textContent = t.hint; $('sizelabel').textContent = t.size; $('walllabel').textContent = t.wall;
-  document.querySelectorAll('.tube-only').forEach(e => e.hidden = s !== 'tube');
-  document.querySelectorAll('.square-only').forEach(e => e.hidden = s !== 'square');
-  document.querySelectorAll('.not-tube').forEach(e => e.hidden = s === 'tube');
+  const show = (sel, on) => document.querySelectorAll(sel).forEach(e => e.hidden = !on);
+  show('.rocket-only', rk); show('.general-only', !rk);
+  if (!rk) { show('.tube-only', s === 'tube'); show('.cornered', !!options?.shapes[s]?.cornered || ['square', 'pentagon', 'hexagon', 'octagon'].includes(s)); show('.not-tube', s !== 'tube'); }
+  else { show('.thread-only', thr); show('.joints-only', joints); }
+  $('jointclear').hidden = rk && !joints;
+  $('clegend').textContent = rk ? 'Joint clearance (radial, per side)' : 'Clearance (radial, per side)';
+  orientHint(); clearanceHint();
+}
+function shapeChanged(resetDefaults) {
+  const s = $('shape').value;
   if (resetDefaults && options) {
     const d = options.shapes[s];
     $('sizes').value = d.sizes.join(', '); $('lengths').value = d.lengths.join(', '); $('wall').value = d.wall;
   }
-  orientHint();
+  refresh();
 }
 function orientHint() {
-  const flat = $('orientation').value === 'flat', tube = $('shape').value === 'tube';
-  $('orienthint').textContent = flat
-    ? `The ${tube ? 'closed end' : 'head'} sits on the bed${tube ? ', cup open upward' : ', peg pointing up'}; the label is recessed into it and reads from below. Prints reliably.`
+  const flat = $('orientation').value === 'flat';
+  const end = mode === 'rocket' || $('shape').value === 'tube' ? 'closed end' : 'head';
+  let t = flat
+    ? `The ${end} sits on the bed${end === 'closed end' ? ', cup open upward' : ', peg pointing up'}; the label is recessed into it and reads from below. Prints reliably.`
     : 'The peg prints as a real part usually would, insertion end on the bed. Use it if your real part prints that way: the elephant foot then affects the fit.';
+  if (mode === 'rocket' && $('jthread').checked) t += ' Motor caps always print face down, as on Rocket Builder; the boss stands on its flange.';
+  $('orienthint').textContent = t;
 }
+
+// The rocket's numbers, from the server (fitgen/rocket.py, Rocket Builder's arithmetic).
+let rdims = null, rdimsSeq = 0;
+async function rocketDims() {
+  const q = new URLSearchParams({ motor: $('motor').value || 'M18', wall: $('rwall').value || 1.5, offset: $('roffset').value || 0 });
+  const seq = ++rdimsSeq;
+  try {
+    const r = await fetch(`api/rocket?${q}`), d = await r.json();
+    if (seq !== rdimsSeq) return;
+    if (!r.ok) { rdims = null; $('rdims').textContent = d.error || 'Check the rocket inputs.'; return; }
+    rdims = d;
+    $('rdims').textContent = `Body tube ${d.body_od} mm OD, ${d.body_id} mm bore; motor bay ${d.bay_id} mm.`;
+    $('jbodylen').textContent = `· ${d.lengths.body} mm shoulder`;
+    $('jnoselen').textContent = `· ${d.lengths.nose} mm shoulder`;
+    $('jthreadlen').textContent = `· ${d.thread.pitch} mm pitch, ${d.thread.turns} turns`;
+    clearanceHint();
+  } catch { /* offline: the build will say so */ }
+}
+['motor', 'rwall', 'roffset'].forEach(id => $(id).addEventListener('input', rocketDims));
+['jbody', 'jnose', 'jthread'].forEach(id => $(id).addEventListener('change', refresh));
+
 $('shape').onchange = () => shapeChanged(true);
 $('orientation').onchange = orientHint;
 $('chamferon').onchange = () => { $('chamfer').disabled = !$('chamferon').checked; };
@@ -263,20 +359,98 @@ $('plate').addEventListener('input', () => {
 });
 
 function request() {
-  return {
-    shape: $('shape').value,
-    sizes: nums($('sizes').value),
+  const common = {
     clearances: clearances(),
-    lengths: nums($('lengths').value),
-    wall: $('wall').value === '' ? null : +$('wall').value,
     chamfer: $('chamferon').checked ? +$('chamfer').value : 0,
-    seat: $('seat').value,
-    corner_radius: +$('corner').value,
     orientation: $('orientation').value,
-    vent: $('vent').checked,
     plate: +$('plate').value,
   };
+  if (mode === 'rocket') return {
+    mode, ...common,
+    motor: $('motor').value, wall: +$('rwall').value, body_offset: +$('roffset').value || 0,
+    joints: ['body', 'nose'].filter(j => $(`j${j}`).checked), seat: $('rseat').value,
+    thread: $('jthread').checked, thread_clearances: threadClearances(),
+  };
+  return {
+    mode, ...common,
+    shape: $('shape').value,
+    sizes: nums($('sizes').value),
+    lengths: nums($('lengths').value),
+    wall: $('wall').value === '' ? null : +$('wall').value,
+    seat: $('seat').value,
+    corner_radius: +$('corner').value,
+    vent: $('vent').checked,
+  };
 }
+
+// ---------- checks before sending: each names its field ----------
+function problems(req) {
+  const out = [], bad = (id, msg) => out.push({ id, msg });
+  const list = (id, vals, what) => { if (!vals.length || !vals.every(v => Number.isFinite(v) && v > 0)) bad(id, `${what}: enter one or more positive numbers in mm, separated by commas.`); };
+  const n = (id, what, lo, hi) => { const v = $(id).value; if (v === '' || !Number.isFinite(+v) || +v < lo || +v > hi) bad(id, `${what} must be a number from ${lo} to ${hi}.`); };
+  if (cmode === 'list') list('clearances', req.clearances, 'Clearances');
+  else { n('cstart', 'Clearance start', 0, 1.5); n('cstep', 'Clearance step', 0.001, 1); n('ccount', 'Clearance count', 1, 20); }
+  if ($('chamferon').checked) n('chamfer', 'Chamfer size', 0.1, 2);
+  n('plate', 'Plate size', 60, 500);
+  if (req.mode === 'rocket') {
+    n('rwall', 'Wall thickness', 0.8, 3); n('roffset', 'Body OD offset', 0, 80);
+    if (!req.joints.length && !req.thread) bad('jbody', 'Tick at least one thing to test: a joint or the motor thread.');
+    if (req.thread) { n('tstart', 'Thread clearance start', 0.05, 1); n('tstep', 'Thread clearance step', 0.01, 0.5); n('tcount', 'Thread clearance count', 1, 12); }
+  } else {
+    list('sizes', req.sizes, 'Sizes'); list('lengths', req.lengths, 'Engagement lengths');
+    if ($('wall').value !== '') n('wall', 'Wall', 0.8, 10);
+    if (!$('corner').hidden && !$('corner').closest('[hidden]')) n('corner', 'Corner radius', 0, 50);
+  }
+  return out;
+}
+function showErrors(items, fieldIds = []) {
+  document.querySelectorAll('[aria-invalid=true]').forEach(e => e.removeAttribute('aria-invalid'));
+  fieldIds.forEach(id => $(id)?.setAttribute('aria-invalid', 'true'));
+  const box = $('formerr');
+  if (!items.length) { box.hidden = true; box.innerHTML = ''; return; }
+  box.innerHTML = items.length === 1 ? esc(items[0]) : `Fix these, then press Build again:<ul>${items.map(m => `<li>${esc(m)}</li>`).join('')}</ul>`;
+  box.hidden = false;
+}
+document.querySelectorAll('#form input, #form select').forEach(e => e.addEventListener('input', () => {
+  if (e.getAttribute('aria-invalid')) e.removeAttribute('aria-invalid');
+}));
+
+// ---------- remember the inputs in this browser (per tab), and reset ----------
+const STORE = 'fit-test-builder:v2';
+const FIELDS = [...document.querySelectorAll('#form input, #form select')].map(e => e.id).filter(id => id && id !== 'printer');
+let defaults = {};
+function snapshot() {
+  const v = {};
+  for (const id of FIELDS) { const e = $(id); v[id] = e.type === 'checkbox' ? e.checked : e.value; }
+  return { mode, cmode, v };
+}
+function restore(st) {
+  if (!st?.v) return;
+  for (const [id, val] of Object.entries(st.v)) {
+    const e = $(id); if (!e) continue;
+    if (e.type === 'checkbox') e.checked = !!val;
+    else if (e.tagName !== 'SELECT' || [...e.options].some(o => o.value === val)) e.value = val;
+  }
+  if (st.cmode) setCmode(st.cmode);
+  $('chamfer').disabled = !$('chamferon').checked;
+}
+let saveTimer = 0;
+function save() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => { try { localStorage.setItem(STORE, JSON.stringify(snapshot())); } catch {} }, 200);
+}
+document.getElementById('form').addEventListener('input', save);
+document.getElementById('form').addEventListener('change', save);
+$('reset').onclick = () => {
+  const ids = mode === 'rocket'
+    ? ['motor', 'rwall', 'roffset', 'jbody', 'jnose', 'jthread', 'rseat', 'tstart', 'tstep', 'tcount']
+    : ['shape', 'sizes', 'lengths', 'wall', 'seat', 'corner', 'vent'];
+  for (const id of [...ids, 'cstart', 'cstep', 'ccount', 'clearances', 'chamferon', 'chamfer', 'orientation', 'plate']) {
+    const e = $(id); if (e.type === 'checkbox') e.checked = defaults.v[id]; else e.value = defaults.v[id];
+  }
+  setCmode('range'); $('chamfer').disabled = !$('chamferon').checked; $('plate').dispatchEvent(new Event('input'));
+  showErrors([]); shapeChanged(false); rocketDims(); save();
+};
 
 // ---------- viewer (same set-up and look as Rocket Builder) ----------
 const view = $('view');
@@ -526,16 +700,25 @@ function showTipFor(name) {
 // ---------- build ----------
 $('form').onsubmit = async ev => {
   ev.preventDefault();
+  const req = request();
+  const found = problems(req);
+  if (found.length) { showErrors(found.map(p => p.msg), found.map(p => p.id)); setStatus('Check the highlighted fields.'); return; }
+  showErrors([]); save();
   const btn = $('build'); btn.disabled = true;
   ['dl3mf', 'dlzip'].forEach(id => $(id).classList.add('off'));
-  const req = request();
-  const n = req.sizes.length * (1 + req.lengths.length * req.clearances.length);
-  setStatus(`Building ${n} coupons…`); progressStart(1 + 0.6 * n);
+  const n = req.mode === 'rocket'
+    ? 1 + req.joints.length * req.clearances.length + (req.joints.length ? 1 : 0) + (req.thread ? 1 + req.thread_clearances.length : 0)
+    : req.sizes.length * (1 + req.lengths.length * req.clearances.length);
+  const est = req.mode === 'rocket' ? 1 + 0.6 * req.joints.length * req.clearances.length + (req.thread ? 2 + 4 * req.thread_clearances.length : 0) : 1 + 0.6 * n;
+  setStatus(`Building ${n} coupons…`); progressStart(est);
   try {
-    const res = await fetch('api/build', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req) });
+    let res;
+    try { res = await fetch('api/build', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req) }); }
+    catch { throw new Error("Couldn't reach the server. Check your connection and press Build again; your settings are kept."); }
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const msg = body.error || (Array.isArray(body.detail) ? body.detail.map(d => `${d.loc.at(-1)}: ${d.msg}`).join('; ') : body.detail) || res.statusText;
+      const msg = body.error || (Array.isArray(body.detail) ? body.detail.map(d => `${d.loc.at(-1)}: ${d.msg}`).join('; ') : body.detail)
+        || (res.status >= 500 ? `The server had a problem (${res.status}). Try again in a minute; your settings are kept.` : res.statusText);
       throw new Error(msg);
     }
     report = body.report; buildId = body.id; pinned = null;
@@ -551,8 +734,9 @@ $('form').onsubmit = async ev => {
     ['dl3mf', 'dlzip'].forEach(id => $(id).classList.remove('off'));
     setStatus(`${report.count} coupons, ${report.plate.fits ? 'fits the plate' : "doesn't fit the plate"} · ${hintText}`);
   } catch (e) {
-    setStatus('Build failed.');
-    $('report').innerHTML = `<div class="error">${esc(e.message || e)}</div>`;
+    setStatus('Build failed: see the message under the form. Your settings are kept.');
+    showErrors([e.message || String(e)]);
+    $('report').innerHTML = `<div class="error"><b>Build failed.</b> ${esc(e.message || e)}</div>`;
   } finally {
     btn.disabled = false; progressEnd();
   }
@@ -565,9 +749,19 @@ $('form').onsubmit = async ev => {
   for (const [name, side] of Object.entries(options?.printers || { 'Bambu Lab X1C / P1S / A1': 256 })) pr.add(new Option(`${name} (${side} mm)`, side));
   pr.add(new Option('Custom', 'custom'));
   pr.value = '256';
+  for (const m of options?.rocket?.motors || ['M13', 'M18', 'M24', 'M24L', 'M29']) $('motor').add(new Option(m, m));
+  $('motor').value = options?.rocket?.default_motor || 'M18';
   shapeChanged(true);
   if (!options) { $('sizes').value = '10'; $('lengths').value = '10'; $('wall').value = 2.5; }
   setCmode('range');
+  defaults = snapshot();
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(STORE) || 'null'); } catch {}
+  restore(saved);
+  $('plate').dispatchEvent(new Event('input'));
+  const h = location.hash.slice(1);
+  setMode(h === 'rocket' || h === 'general' ? h : saved?.mode || 'general');
+  shapeChanged(false); rocketDims();
   applyTheme(); frame(256);
 })();
 </script>

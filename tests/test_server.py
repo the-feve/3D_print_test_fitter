@@ -17,7 +17,7 @@ REQ = {"shape": "round", "sizes": [8], "clearances": [0.1, 0.2], "lengths": [6]}
 def test_page_and_options():
     assert "Fit Test Builder" in client.get("/").text
     o = client.get("/api/options").json()
-    assert set(o["shapes"]) == {"round", "square", "tube"}
+    assert set(o["shapes"]) == {"round", "square", "pentagon", "hexagon", "octagon", "tube"}
 
 
 def test_build_previews_and_downloads():
@@ -67,3 +67,32 @@ def test_new_builds_are_rate_limited(monkeypatch):
     monkeypatch.setattr(srv, "_hits", srv.defaultdict(srv.deque))
     r = client.post("/api/build", json={**REQ, "clearances": [0.3]})
     assert r.status_code == 429 and "Too many" in r.json()["detail"]
+
+
+def test_options_list_polygons_and_rocket_motors():
+    o = client.get("/api/options").json()
+    assert {"pentagon", "hexagon", "octagon"} <= set(o["shapes"]) and o["shapes"]["hexagon"]["sides"] == 6
+    assert o["rocket"]["motors"][:2] == ["M13", "M18"] and o["rocket"]["dims"]["M18"]["body_id"] == 18.4
+    d = client.get("/api/rocket", params={"motor": "M24", "wall": 2, "offset": 5}).json()
+    assert d["body_id"] == 34.4 and d["lengths"]["body"] == 24.8
+    assert "Unknown motor" in client.get("/api/rocket", params={"motor": "X"}).json()["error"]
+
+
+def test_rocket_mode_build():
+    r = client.post("/api/build", json={"mode": "rocket", "motor": "M13", "joints": ["body", "nose"],
+                                        "clearances": [0.15], "thread_clearances": [0.25]})
+    assert r.status_code == 200, r.text
+    rep = r.json()["report"]
+    assert rep["mode"] == "rocket" and rep["rocket"]["body_id"] == 13.4
+    assert [c["name"] for c in rep["coupons"]] == ["D13.4_socket", "D13.4_L10_C15", "D13.4_L7_C15", "M13_boss", "M13_T25"]
+    z = client.get(f"/api/builds/{r.json()['id']}/stl.zip")
+    assert 'filename="fit_test_rocket_M13_stl.zip"' in z.headers["content-disposition"]
+
+
+def test_general_polygon_build_and_messages():
+    r = client.post("/api/build", json={"shape": "hexagon", "sizes": [10], "clearances": [0.15], "lengths": [6]})
+    assert r.status_code == 200 and [c["name"] for c in r.json()["report"]["coupons"]] == ["H10_socket", "H10_L6_C15"]
+    r = client.post("/api/build", json={"shape": "hexagon", "sizes": [10], "corner_radius": 4})
+    assert r.status_code == 422 and "quarter" in r.json()["error"]
+    r = client.post("/api/build", json={"mode": "rocket", "joints": [], "thread": False})
+    assert r.status_code == 422 and "Pick something" in r.json()["error"]

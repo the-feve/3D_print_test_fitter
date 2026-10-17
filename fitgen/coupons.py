@@ -1,6 +1,6 @@
 """Fit-test coupons: a socket per size and a peg per clearance (x length).
 
-Three shapes:
+The shapes:
 
 - round: a solid round peg in a blind round socket. The peg has a head (a
   flat shoulder stop) that rests on the socket's top face when seated.
@@ -8,6 +8,9 @@ Three shapes:
   corners are rounded (sharp inside corners print tight); the peg is the
   socket hole offset inward by the clearance, so the gap is the same all
   round, corners included.
+- pentagon, hexagon, octagon: regular polygons, built like the square (size
+  = across flats, inside corners rounded, peg = socket hole offset inward by
+  the clearance). A flat faces +Y, where the socket's label tab is.
 - tube: the rocket joint, ported from rocket-builder-web
   geometry/rocketgen/fit_test.py: a hollow shoulder (a cup with a closed
   end) into a tube bore, seated on a 45-degree countersink or a flat stop.
@@ -29,15 +32,18 @@ from __future__ import annotations
 import math
 from dataclasses import asdict, dataclass, field
 
-from build123d import Axis, Rectangle, RectangleRounded, Solid, extrude
+from build123d import Axis, Circle, Kind, Polygon, Rectangle, RectangleRounded, Solid, extrude, offset
 
 from . import labels
 from .geom import GeometryError, box, revolve, sound
 
-SHAPES = ("round", "square", "tube")
-DEFAULT_WALL = {"round": 2.5, "square": 2.5, "tube": 1.5}
-DEFAULT_SIZES = {"round": (10.0,), "square": (10.0,), "tube": (18.4,)}  # tube: the M18 rocket's body ID
-DEFAULT_LENGTHS = {"round": (10.0,), "square": (10.0,), "tube": (12.0,)}
+SIDES = {"pentagon": 5, "hexagon": 6, "octagon": 8}  # regular polygons: size = across flats
+SHAPES = ("round", "square", *SIDES, "tube")
+CORNERED = ("square", *SIDES)  # shapes with a socket corner radius
+DEFAULT_WALL = {"round": 2.5, "square": 2.5, **{k: 2.5 for k in SIDES}, "tube": 1.5}
+DEFAULT_SIZES = {"round": (10.0,), "square": (10.0,), **{k: (10.0,) for k in SIDES}, "tube": (18.4,)}  # tube: the M18 rocket's body ID
+DEFAULT_LENGTHS = {"round": (10.0,), "square": (10.0,), **{k: (10.0,) for k in SIDES}, "tube": (12.0,)}
+TAGS = {"round": "D", "square": "S", "pentagon": "P", "hexagon": "H", "octagon": "O", "tube": "D"}
 DEFAULT_CLEARANCES = (0.05, 0.10, 0.15, 0.20, 0.25, 0.30)
 
 FLOOR = 2.0  # blind socket floor
@@ -53,13 +59,13 @@ PLA_DENSITY = 1.24  # g/cm3
 @dataclass
 class FitParams:
     shape: str = "round"
-    sizes: tuple[float, ...] = (10.0,)  # nominal: hole diameter / square hole side / tube bore (ID), mm
+    sizes: tuple[float, ...] = (10.0,)  # nominal: hole diameter / square side / polygon across flats / tube bore (ID), mm
     clearances: tuple[float, ...] = DEFAULT_CLEARANCES  # radial, per side, mm
     lengths: tuple[float, ...] = (10.0,)  # engagement length, mm
     wall: float | None = None  # socket wall (round, square) or tube wall; None = the shape's default
     chamfer: float = 0.5  # 45-degree chamfer on the peg's insertion end; 0 = none
     seat: str = "countersink"  # tube only: "countersink" or "flat"
-    corner_radius: float = 1.0  # square only: the socket hole's inside corner radius
+    corner_radius: float = 1.0  # square and polygons: the socket hole's inside corner radius
     orientation: str = "flat"  # "flat" (closed end / head on the bed) or "functional" (insertion end down)
     vent: bool = True  # vent hole in a blind socket's floor
     plate: float = 256.0  # build plate side, mm
@@ -160,11 +166,11 @@ def check(p: FitParams) -> list[str]:
         if p.chamfer > 0.4 * inner:
             raise GeometryError(f"The {num(p.chamfer)} mm chamfer is too big for size {num(s)} mm.")
     notes = []
-    if p.shape == "square" and p.corner_radius < 0:
+    if p.shape in CORNERED and p.corner_radius < 0:
         raise GeometryError("Corner radius can't be negative.")
-    if p.shape == "square" and p.corner_radius > min(p.sizes) / 4:
+    if p.shape in CORNERED and p.corner_radius > min(p.sizes) / 4:
         raise GeometryError("Corner radius must be at most a quarter of the smallest size.")
-    if p.shape == "square" and 0 < p.corner_radius < cmax:
+    if p.shape in CORNERED and 0 < p.corner_radius < cmax:
         notes.append("Corner radius is smaller than the largest clearance: those pegs get sharp corners.")
     return notes
 
@@ -202,7 +208,7 @@ def _peg_lines(p: FitParams, size: float, L: float, c: float) -> list[str]:
 
 
 def _tag(p: FitParams, size: float) -> str:
-    return f"{'S' if p.shape == 'square' else 'D'}{num(size)}"
+    return f"{TAGS[p.shape]}{num(size)}"
 
 
 # ---------- round ----------
@@ -262,6 +268,51 @@ def _square_peg(p: FitParams, size: float, c: float, L: float, hs: float, lines:
     w, h = labels.extent(lines)
     sh = max(size + 2 * p.wall_mm(), w + 3.0, h + 3.0)
     head = extrude(RectangleRounded(sh, sh, min(2.0, sh / 4)), HEAD_T).translate((0, 0, hs))
+    peg = shaft.fuse(head)
+    return peg.cut(labels.cutter(lines, labels.SIZE, hs + HEAD_T, up=True)).clean()
+
+
+# ---------- regular polygons ----------
+
+def _polygon(n: int, flats: float, r: float):
+    """A regular n-gon `flats` across flats with corners rounded to r, a flat
+    facing +Y. Built as the sharp polygon r smaller, offset out by r with arcs,
+    so the flats stay exactly where they should be."""
+    a = flats / 2 - (r if r > 0.01 else 0.0)  # apothem of the sharp core
+    R = a / math.cos(math.pi / n)
+    pts = [(R * math.cos(math.radians(90 + 180 / n + i * 360 / n)), R * math.sin(math.radians(90 + 180 / n + i * 360 / n)))
+           for i in range(n)]
+    core = Polygon(*pts, align=None)
+    return offset(core, r, kind=Kind.ARC) if r > 0.01 else core
+
+
+def _polygon_socket(p: FitParams, size: float) -> tuple[Solid, float]:
+    n, w, cr = SIDES[p.shape], p.wall_mm(), p.corner_radius
+    so = size + 2 * w
+    hs = FLOOR + max(p.lengths) + BOTTOM_GAP
+    body = extrude(_polygon(n, so, cr + w if cr > 0.01 else 1.0), hs)
+    body = body.cut(extrude(_polygon(n, size, cr), hs).translate((0, 0, FLOOR)))
+    tab, cut = _flag(so / 2, [_tag(p, size)])
+    body = body.fuse(tab)
+    if p.vent:
+        body = body.cut(_vent(FLOOR + 1))
+    return body.cut(cut).clean(), hs
+
+
+def _polygon_peg(p: FitParams, size: float, c: float, L: float, hs: float, lines: list[str], notes: list[str]) -> Solid:
+    """As the square peg: the hole offset inward by the clearance (corner
+    radius r - c, sharp if c >= r), with a round head as the stop."""
+    n, ch = SIDES[p.shape], p.chamfer
+    shaft = extrude(_polygon(n, size - 2 * c, p.corner_radius - c), L).translate((0, 0, hs - L))
+    if ch > 0:
+        tip = [e for e in shaft.edges() if abs(e.center().Z - (hs - L)) < 1e-6]
+        try:
+            shaft = sound(shaft.chamfer(ch, None, tip), "chamfer")
+        except Exception:
+            notes.append(f"{num(size)} mm C{code(c)}: the tip chamfer wouldn't build and was left off.")
+    w, h = labels.extent(lines)
+    rh = max((size / 2 + p.wall_mm()) / math.cos(math.pi / n), math.hypot(w, h) / 2 + 1.0)
+    head = extrude(Circle(rh), HEAD_T).translate((0, 0, hs))
     peg = shaft.fuse(head)
     return peg.cut(labels.cutter(lines, labels.SIZE, hs + HEAD_T, up=True)).clean()
 
@@ -332,6 +383,8 @@ def build(p: FitParams) -> tuple[list[Coupon], list[str]]:
             sock, hs = _round_socket(p, size)
         elif p.shape == "square":
             sock, hs = _square_socket(p, size)
+        elif p.shape in SIDES:
+            sock, hs = _polygon_socket(p, size)
         else:
             sock, hs = _tube_socket(p, size)
         sock_name = f"{tag}_socket"
@@ -344,6 +397,8 @@ def build(p: FitParams) -> tuple[list[Coupon], list[str]]:
                     seated = _round_peg(p, size, c, L, hs, lines)
                 elif p.shape == "square":
                     seated = _square_peg(p, size, c, L, hs, lines, notes)
+                elif p.shape in SIDES:
+                    seated = _polygon_peg(p, size, c, L, hs, lines, notes)
                 else:
                     seated = _tube_peg(p, size, c, L, hs, lines, notes)
                 seated = sound(seated, name)

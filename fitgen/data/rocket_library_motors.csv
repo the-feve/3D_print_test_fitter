@@ -1,0 +1,6 @@
+Motor,mtr_d,mtr_len,mtr_hang
+M13,13 mm,45 mm,5 mm
+M18,18 mm,70 mm,8 mm
+M24,24 mm,70 mm,10 mm
+M24L,24 mm,95 mm,10 mm
+M29,29 mm,114 mm,10 mm
