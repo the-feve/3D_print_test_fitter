@@ -796,7 +796,18 @@ $('form').onsubmit = async ev => {
   try { saved = JSON.parse(localStorage.getItem(STORE) || 'null'); } catch {}
   restore(saved);
   $('plate').dispatchEvent(new Event('input'));
-  const h = location.hash.slice(1);
+  // Opened from Rocket Builder ("Generate test fit parts"): ?motor=M18&wall=1.5&offset=0#rocket
+  // fills the Rocket tab with that rocket, then the query is dropped so a reload keeps the user's edits.
+  const q = new URLSearchParams(location.search);
+  let h = location.hash.slice(1);
+  if (q.has('motor') && motorOrder().includes(q.get('motor'))) {
+    $('motors').value = q.get('motor');
+    if (q.has('wall') && Number.isFinite(+q.get('wall'))) $('rwall').value = q.get('wall');
+    if (q.has('offset') && Number.isFinite(+q.get('offset'))) $('roffset').value = q.get('offset');
+    h = 'rocket';
+    history.replaceState(null, '', `${location.pathname}#rocket`);
+    save();
+  }
   setMode(h === 'rocket' || h === 'general' ? h : saved?.mode || 'general');
   renderMotors(); shapeChanged(false); rocketDims();
   applyTheme(); frame(256);
