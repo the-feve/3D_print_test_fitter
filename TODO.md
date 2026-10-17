@@ -12,6 +12,11 @@ Milestones are from `docs/spec.md`. Done items move to HANDOFF.md's log.
 - [ ] Save / load parameter presets in the browser.
 - [ ] Split a set that doesn't fit across plates (one 3MF per plate) instead of only warning.
 
+## Hosting: builds are too heavy for the shared-CPU machine (owner decides)
+- [ ] Owner: check `rocket-fevergeon` → Metrics → CPU (throttling) on the Fly dashboard after a couple of builds.
+- [ ] Zero-cost fix: keep each built set on the `/data` volume (report + per-coupon meshes; 3MF / STL from the meshes, no OpenCascade), prebuild the default sets per motor, so most builds never run OpenCascade on the server. Cheaper caps (no grip ribs) too.
+- [ ] Or run Fit Test Builder on its own small Fly machine (costs a few dollars a month) so it can't slow Rocket Builder.
+
 ## Rocket Builder tab
 - [ ] Rocket Builder Advanced *Fits and joints* inputs (joint clearance, joint lengths, thread clearance / pitch / turns): built 2026-10-17 in rocket-builder-web (PR, not merged). Once merged, this tab could offer the same overrides so a coupon matches a customised rocket.
 - [ ] Optional: motor-in-bay coupons (rings at a few clearances to try a real motor in; Rocket Builder uses 0.2 mm, `mtr_clear`).
