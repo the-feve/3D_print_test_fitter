@@ -18,7 +18,7 @@ See `TODO.md`. In short: print the first plates and check them, then milestone 3
 
 Runs inside the existing Fly app `rocket-fevergeon`, the way Trebuchet Builder does, at **fit.quiverdesignworks.net**, no extra cost. Owner's choices (2026-10-16): Claude gets **no Fly or Cloudflare tokens** (the owner does the account steps; delete any Fly / Cloudflare tokens or variables added to the Claude environment while trying that); **unlisted** (noindex, no links), not admin-only.
 
-**Status (2026-10-17):** Claude's code is done: relative URLs and the per-address build limit here, now on `main` (created 2026-10-17 from `claude/inspiring-mayer-m1ipwo` + the plan notes); the mount, deploy checkout and tests in rocket-builder-web, open as a PR there ("Host Fit Test Builder…"). Owner steps not started.
+**Status (2026-10-17): live at https://fit.quiverdesignworks.net** (also https://rocket-fevergeon.fly.dev/fit/ and https://rocket.quiverdesignworks.net/fit/). All owner steps done: `FIT_REPO_TOKEN` saved, rocket-builder-web PR #37 merged and deployed, Cloudflare CNAME `fit` → `rocket-fevergeon.fly.dev` (DNS only), Fly certificate issued (expires 2027-01-15, renews itself). Checked from a cloud session: page, a build (2.7 s warm), plate GLB, 3MF, STL ZIP, three.js, `X-Robots-Tag: noindex`. **Updating the live site:** push to this repo's `main`, then run rocket-builder-web's *Deploy to Fly.io* workflow by hand (or add a `ROCKET_DEPLOY_TOKEN` secret here and a workflow that sends the `fit-updated` dispatch, as trebuchet_builder does). The steps below are kept for reference.
 
 1. **GitHub read token: do this first; it is the one thing blocking the deploy.** github.com/settings/personal-access-tokens/new → fine-grained; name `fit-test-deploy`; Resource owner `the-feve`; Repository access: *Only select repositories* → `3D_print_test_fitter`; Permissions → Repository → **Contents: Read-only**; Generate, copy.
    Then github.com/the-feve/rocket-builder-web → Settings → Secrets and variables → Actions → **New repository secret** → name `FIT_REPO_TOKEN`, paste, Add secret. Don't paste it in chat.
@@ -53,6 +53,7 @@ Don't link it from quiverdesignworks.net or the builders until the owner says so
 
 ## Log
 
+- 2026-10-17: live at fit.quiverdesignworks.net (unlisted).
 - 2026-10-17: `main` created; hosting made unlisted (noindex) instead of admin-only, per the owner's 2026-10-16 choice.
 - 2026-10-16: hosting code: relative page URLs, per-address build limit, bounded lock wait, lock shared with the host; the mount and admin gate in rocket-builder-web. Fly / Cloudflare tokens not available in the session.
 - 2026-10-16: hosting plan and owner steps written (Hosting setup); owner does the account steps, Claude the code (not started).

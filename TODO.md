@@ -23,8 +23,8 @@ Milestones are from `docs/spec.md`. Done items move to HANDOFF.md's log.
 ## Milestone 4: hosting (owner steps in HANDOFF.md → Hosting setup)
 - [x] Claude: relative URLs, per-address build limit here; mount (unlisted, noindex, shared build lock), deploy checkout and tests in rocket-builder-web (PR).
 - [x] `main` branch here (2026-10-17).
-- [ ] Owner: `FIT_REPO_TOKEN` (step 1), merge the rocket-builder-web PR (step 3).
-- [ ] Owner: `fit.quiverdesignworks.net` DNS (DNS only) and Fly cert (steps 4–5).
+- [x] Owner: `FIT_REPO_TOKEN`, rocket-builder-web PR #37, DNS, Fly cert. Live 2026-10-17 at fit.quiverdesignworks.net (unlisted).
+- [ ] Optional: redeploy rocket-builder-web automatically when this repo's `main` changes (`fit-updated` dispatch, like trebuchet_builder).
 - [ ] Links from quiverdesignworks.net and the builders' switcher (`nav.apps`) — only once the owner says it's ready.
 
 ## Milestone 5: later shapes
