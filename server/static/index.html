@@ -120,15 +120,15 @@
 </script>
 <script type="importmap">
 { "imports": {
-  "three": "static/vendor/three/build/three.module.js",
-  "three/addons/": "static/vendor/three/examples/jsm/"
+  "three": "./static/vendor/three/build/three.module.js",
+  "three/addons/": "./static/vendor/three/examples/jsm/"
 } }
 </script>
 </head>
 <body>
 <header><h1>Fit Test Builder</h1><nav><a href="https://quiverdesignworks.net/">← Quiver Design Works</a></nav><span class="units">Beta · units mm · clearances radial (per side)</span><button id="theme" type="button"></button></header>
 <main>
-  <form id="form" autocomplete="off" novalidate>
+  <form id="form" autocomplete="off" novalidate onsubmit="return false">
     <fieldset>
       <legend>Shape</legend>
       <label class="wide">Coupon <select id="shape">

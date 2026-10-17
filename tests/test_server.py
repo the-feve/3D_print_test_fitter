@@ -52,6 +52,11 @@ def test_page_works_under_a_prefix():
     c = TestClient(host)
     page = c.get("/fit/").text
     assert "'/api/" not in page and '"/static/' not in page and "`/api/" not in page
+    # Import map addresses must start with ./ ../ or / ; a bare "static/..." is
+    # ignored, three.js never loads and Build falls back to a plain form submit.
+    import json, re
+    imports = json.loads(re.search(r'<script type="importmap">(.*?)</script>', page, re.S).group(1))["imports"]
+    assert imports and all(v.startswith("./") for v in imports.values()), imports
     assert c.get("/fit/static/vendor/three/build/three.module.js").status_code == 200
     assert "shapes" in c.get("/fit/api/options").json()
 
