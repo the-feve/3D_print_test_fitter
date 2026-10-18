@@ -3,131 +3,184 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#111113" media="(prefers-color-scheme: dark)">
-<meta name="robots" content="noindex">
+<meta name="theme-color" content="#FFFDF8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#12203A" media="(prefers-color-scheme: dark)">
+<meta name="description" content="Print a plate of test pegs and sockets at a range of clearances and find the fit your printer makes: Rocket Builder's joints and motor thread, or any shape.">
 <title>Fit Test Builder · Quiver Design Works</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect x=%271%27 y=%277%27 width=%2714%27 height=%278%27 rx=%271.5%27 fill=%27%236e6e73%27/%3E%3Crect x=%275%27 y=%271%27 width=%276%27 height=%2710%27 rx=%271%27 fill=%27%230a58ca%27/%3E%3C/svg%3E">
+<link rel="icon" href="static/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="static/apple-touch-icon.png">
 <style>
-  /* Palette and layout match Rocket Builder (and fevergeon.com / quiverdesignworks.net):
-     neutral greys, one blue accent, inverted "ink on paper" primary button.
-     Follows the system light/dark setting; the header button overrides it. */
+  /* Self-hosted (OFL, static/fonts/LICENSE-*.txt), same files as Rocket Builder. Relative URLs, so they
+     load under /fit/ in Rocket Builder's app and at the root of fit.quiverdesignworks.net. */
+  @font-face { font-family:"Inter"; src:url(static/fonts/inter.woff2) format("woff2"); font-weight:100 900; font-style:normal; font-display:swap; }
+  @font-face { font-family:"Space Grotesk"; src:url(static/fonts/space-grotesk.woff2) format("woff2"); font-weight:300 700; font-style:normal; font-display:swap; }
+</style>
+<style>
+  /* Brand: Rocket Builder by Quiver Design Works (rocket-builder-web docs/brand/tokens.css and brand.md),
+     the same tokens and look as Rocket Builder's page. Night #12203A ink, Paper #F6F1E7 page,
+     Launch orange #F2652B only on the one main action (Build) and in the mark, Sky #3D8BFD links / focus.
+     Follows the system light/dark setting; the header button pins one (data-theme). */
   :root {
+    --rb-night:#12203A; --rb-paper:#F6F1E7; --rb-orange:#F2652B; --rb-sky:#3D8BFD; --rb-red:#E5484D; --rb-green:#2FB67C; --rb-grey:#6E6E73;
+    --font-head:"Space Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-body:"Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --chamfer:polygon(5px 0, calc(100% - 5px) 0, 100% 5px, 100% calc(100% - 5px), calc(100% - 5px) 100%, 5px 100%, 0 calc(100% - 5px), 0 5px);
+    --grid-paper:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cpath d='M8.5 0V40M16.5 0V40M24.5 0V40M32.5 0V40M0 8.5H40M0 16.5H40M0 24.5H40M0 32.5H40' stroke='%233D8BFD' stroke-opacity='.08'/%3E%3Cpath d='M.5 0V40M0 .5H40' stroke='%233D8BFD' stroke-opacity='.2'/%3E%3C/svg%3E");
+    --grid-night:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cpath d='M8.5 0V40M16.5 0V40M24.5 0V40M32.5 0V40M0 8.5H40M0 16.5H40M0 24.5H40M0 32.5H40' stroke='%23F6F1E7' stroke-opacity='.035'/%3E%3Cpath d='M.5 0V40M0 .5H40' stroke='%23F6F1E7' stroke-opacity='.09'/%3E%3C/svg%3E");
     color-scheme: light;
-    --bg:#fff; --panel:#fff; --card:#f5f5f7; --ink:#1d1d1f; --muted:#6e6e73; --line:#e5e5ea; --rowline:#efeff2;
-    --field:#fff; --accent:#0a58ca; --accent-ink:#fff; --err:#d70015; --errbg:#fff2f3; --errline:#f5c2c7;
-    --view-top:#f5f5f7; --view-bot:#e9e9ee; --chip:rgba(255,255,255,.88); --ok:#1a7f37; --warn:#9a6700;
+    --bg:#FBF8F2; --panel:#FFFDF8; --card:#F6F1E7; --ink:#12203A; --muted:#6E6E73; --line:#E8E0CF; --rowline:#F0EADD;
+    --field:#FFFDF8; --accent:#1D5BC4; --accent-ink:#fff; --err:#C22E33; --errbg:#FCE3E3; --errline:#F19A9C;
+    --view-top:#F6F1E7; --view-bot:#EDE6D8; --chip:rgba(255,253,248,.9); --ok:#17754E; --warn:#8A5A00;
+    --cta:var(--rb-orange); --cta-ink:var(--rb-night); --grid:var(--grid-paper);
+    --hover:rgba(18,32,58,.06);
     --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
     --safe-l:env(safe-area-inset-left,0px); --safe-r:env(safe-area-inset-right,0px);
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme=light]) {
       color-scheme: dark;
-      --bg:#111113; --panel:#111113; --card:#1c1c1f; --ink:#f2f2f4; --muted:#a1a1a6; --line:#2c2c30; --rowline:#222226;
-      --field:#1c1c1f; --accent:#6ea8fe; --accent-ink:#111113; --err:#ff8a80; --errbg:#2e1416; --errline:#5c2a2c;
-      --view-top:#1c1c1f; --view-bot:#0b0b0d; --chip:rgba(28,28,31,.88); --ok:#56d364; --warn:#e3b341;
+      --bg:#0B1526; --panel:#12203A; --card:#1B2C4B; --ink:#F6F1E7; --muted:#A9B4C8; --line:#263A5E; --rowline:#1B2C4B;
+      --field:#1B2C4B; --accent:#8BBBFE; --accent-ink:#12203A; --err:#F19A9C; --errbg:#3B1A22; --errline:#6B2C33;
+      --view-top:#1B2C4B; --view-bot:#0B1526; --chip:rgba(18,32,58,.9); --ok:#85D7B2; --warn:#F0B44C;
+      --grid:var(--grid-night); --hover:rgba(246,241,231,.07);
     }
   }
   :root[data-theme=dark] {
     color-scheme: dark;
-    --bg:#111113; --panel:#111113; --card:#1c1c1f; --ink:#f2f2f4; --muted:#a1a1a6; --line:#2c2c30; --rowline:#222226;
-    --field:#1c1c1f; --accent:#6ea8fe; --accent-ink:#111113; --err:#ff8a80; --errbg:#2e1416; --errline:#5c2a2c;
-    --view-top:#1c1c1f; --view-bot:#0b0b0d; --chip:rgba(28,28,31,.88); --ok:#56d364; --warn:#e3b341;
+    --bg:#0B1526; --panel:#12203A; --card:#1B2C4B; --ink:#F6F1E7; --muted:#A9B4C8; --line:#263A5E; --rowline:#1B2C4B;
+    --field:#1B2C4B; --accent:#8BBBFE; --accent-ink:#12203A; --err:#F19A9C; --errbg:#3B1A22; --errline:#6B2C33;
+    --view-top:#1B2C4B; --view-bot:#0B1526; --chip:rgba(18,32,58,.9); --ok:#85D7B2; --warn:#F0B44C;
+    --grid:var(--grid-night); --hover:rgba(246,241,231,.07);
   }
   * { box-sizing:border-box; }
   html { -webkit-text-size-adjust:100%; text-size-adjust:100%; }
-  body { margin:0; font:14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--ink); background:var(--bg);
+  body { margin:0; font:14px/1.45 var(--font-body); color:var(--ink); background:var(--bg);
     -webkit-tap-highlight-color:transparent; display:flex; flex-direction:column; height:100vh; height:100dvh; }
   a { color:var(--accent); }
   header { flex:none; display:flex; align-items:center; flex-wrap:wrap; gap:6px 18px; min-height:52px;
     padding:calc(8px + var(--safe-t)) calc(16px + var(--safe-r)) 8px calc(16px + var(--safe-l));
     border-bottom:1px solid var(--line); background:var(--panel); }
-  header h1 { font-size:1.15rem; font-weight:700; letter-spacing:.02em; margin:0; }
-  header nav { display:flex; gap:18px; align-items:center; font-size:14px; }
-  header nav a { color:var(--ink); text-decoration:none; }
-  header nav a:hover { text-decoration:underline; text-underline-offset:5px; }
+  header h1 { display:flex; align-items:center; gap:8px; margin:0; font:700 1.2rem/1 var(--font-head); letter-spacing:-.01em; }
+  header h1 a { display:flex; align-items:center; gap:8px; color:var(--ink); text-decoration:none; }
+  header h1 svg { width:30px; height:30px; flex:none; display:block; }
+  .betatag { display:inline-block; padding:2px 6px; font:700 9.5px/1 var(--font-head); letter-spacing:.1em; text-transform:uppercase; color:var(--muted); border:1px solid var(--line); clip-path:var(--chamfer); }
+  header nav { display:flex; gap:18px; align-items:center; font-size:13.5px; }
+  header nav a { color:var(--muted); text-decoration:none; }
+  header nav a:hover { color:var(--ink); text-decoration:underline; text-underline-offset:5px; }
   header .units { color:var(--muted); font-size:12px; }
-  #theme { margin-left:auto; flex:none; padding:5px 12px; font:500 12px system-ui, -apple-system, sans-serif; color:var(--muted);
-    background:transparent; border:1px solid var(--line); border-radius:6px; cursor:pointer; }
-  #theme:hover { color:var(--ink); border-color:var(--muted); }
-  main { flex:1 1 auto; min-height:0; display:grid; grid-template-columns:330px minmax(0,1fr); }
-  #form { overflow-y:auto; -webkit-overflow-scrolling:touch; padding:8px 14px 16px calc(14px + var(--safe-l)); background:var(--panel); border-right:1px solid var(--line); }
-  fieldset { border:none; border-top:1px solid var(--line); margin:10px 0 0; padding:8px 0 0; min-width:0; }
-  legend { font-weight:600; font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); padding:0 6px 0 0; }
+  #theme { margin-left:auto; flex:none; padding:5px 12px; font:500 12px var(--font-body); color:var(--muted);
+    background:transparent; border:0; border-radius:8px; cursor:pointer; }
+  #theme:hover { color:var(--ink); background:var(--hover); }
+  main { flex:1 1 auto; min-height:0; display:grid; grid-template-columns:340px minmax(0,1fr); }
+  #form { overflow-y:auto; -webkit-overflow-scrolling:touch; padding:8px 16px 16px calc(16px + var(--safe-l)); background:var(--panel); border-right:1px solid var(--line); }
+  fieldset { border:none; border-top:1px solid var(--line); margin:6px 0 0; padding:4px 0 0; min-width:0; }
+  legend { display:flex; align-items:center; width:100%; padding:0; font:600 11.5px/1.6 var(--font-head); text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
+  /* Each section folds, like Rocket Builder's Advanced form: the heading is the toggle. */
+  .fold { flex:none; display:inline-flex; align-items:center; gap:7px; min-height:28px; padding:3px 0; margin:0; border:0; border-radius:0; background:transparent; color:inherit;
+    font:inherit; letter-spacing:inherit; text-transform:inherit; text-align:left; cursor:pointer; }
+  .fold::before { content:""; width:7px; height:7px; border:solid currentColor; border-width:0 1.75px 1.75px 0; transform:rotate(45deg) translate(-2px,-2px); transition:transform .15s; }
+  .fold[aria-expanded=false]::before { transform:rotate(-45deg); }
+  .fold:hover { color:var(--ink); }
+  @media (pointer:coarse) { .fold { min-height:40px; } }
+  fieldset.shut > :not(legend) { display:none !important; }
   label { display:grid; grid-template-columns:1fr 120px; align-items:center; gap:8px; margin:6px 0; }
   label.check { grid-template-columns:1fr auto; }
   label.wide { grid-template-columns:1fr; gap:3px; }
-  input[type=number], input[type=text], select { width:100%; padding:5px 7px; border:1px solid var(--line); border-radius:6px; font:inherit; color:var(--ink); background:var(--field); }
+  input[type=number], input[type=text], select { width:100%; padding:5px 7px; border:1px solid var(--line); border-radius:7px; font:inherit; font-variant-numeric:tabular-nums; color:var(--ink); background:var(--field); }
+  input[type=number]:hover, input[type=text]:hover, select:hover { border-color:color-mix(in srgb, var(--ink) 30%, var(--line)); }
   input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
   input:disabled { opacity:.5; }
   input[type=checkbox], input[type=radio] { accent-color:var(--accent); width:16px; height:16px; margin:0; }
   .hint { color:var(--muted); font-size:11.5px; margin:-2px 0 4px; }
   .row3 { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
   .row3 label { grid-template-columns:1fr; gap:2px; margin:2px 0; font-size:12px; color:var(--muted); }
-  .seg { display:flex; margin:6px 0 2px; border:1px solid var(--line); border-radius:6px; overflow:hidden; }
-  .seg button { flex:1; padding:5px 8px; border:0; border-radius:0; font:600 12px system-ui; color:var(--muted); background:transparent; cursor:pointer; }
-  .seg button[aria-pressed=true] { color:var(--accent-ink); background:var(--accent); }
+  /* Segmented controls (the builder tabs, Range / List): Rocket Builder's mode switch, Night pill for the current one. */
+  .seg { display:flex; gap:2px; margin:6px 0 2px; padding:3px; border-radius:10px; background:var(--card); }
+  .seg button { flex:1; padding:5px 8px; border:0; border-radius:7px; font:600 12px var(--font-body); color:var(--muted); background:transparent; cursor:pointer; }
+  .seg button:hover { color:var(--ink); }
+  .seg button[aria-pressed=true] { color:var(--panel); background:var(--ink); }
   [hidden] { display:none !important; }
-  .modes { margin:4px 0 0; }
-  .modes button { padding:8px; font-size:13px; }
+  .modes { margin:6px 0 0; }
+  .modes button { padding:7px 8px; font-size:13px; }
+  #modehint { font-size:11.5px; margin:5px 0 2px; }
   [aria-invalid=true] { border-color:var(--err) !important; background:var(--errbg) !important; }
-  #formerr { flex:1 1 100%; margin:0; color:var(--err); background:var(--errbg); border:1px solid var(--errline); padding:7px 9px; border-radius:6px; font-size:12.5px; }
+  #formerr { flex:1 1 100%; margin:0; color:var(--err); background:var(--errbg); border:1px solid var(--errline); padding:7px 9px; border-radius:8px; font-size:12.5px; }
   #formerr ul { margin:2px 0 0; padding-left:16px; }
   label.motorrow { grid-template-columns:1fr 170px; }
   .addrow { display:flex; gap:6px; }
   .addrow select { flex:1; min-width:0; }
-  button.small { flex:none; padding:4px 12px; font:600 12px system-ui; border:1px solid var(--line); background:transparent; color:var(--ink); }
-  button.small:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); }
+  button.small { flex:none; padding:4px 12px; font:600 12px var(--font-body); border:1px solid var(--line); border-radius:7px; background:transparent; color:var(--ink); }
+  button.small:hover:not(:disabled) { background:var(--hover); }
   button.small:disabled { opacity:.4; cursor:default; }
+  /* Motor sizes on the plate: chamfered tags, like Rocket Builder's part letters. */
   .chips { display:flex; flex-wrap:wrap; gap:6px; margin:2px 0 6px; }
-  .chips button { flex:none; padding:3px 6px 3px 10px; border:1px solid var(--line); border-radius:14px; background:var(--card); color:var(--ink); font:600 12px system-ui; }
-  .chips button span { color:var(--muted); margin-left:6px; font-weight:400; }
-  .chips button:hover span { color:var(--err); }
-  .linkbtn { flex:1 1 100%; text-align:center; padding:2px 0 0; border:0; background:none; color:var(--muted); font:500 12px system-ui; text-decoration:underline; cursor:pointer; }
-  .actions { position:sticky; bottom:-16px; background:var(--panel); padding:10px 0 6px; display:flex; flex-wrap:wrap; gap:8px; border-top:1px solid var(--line); margin-top:12px; }
-  button, a.btn { flex:1; padding:9px 12px; border-radius:6px; border:1px solid transparent; font:600 14px system-ui, -apple-system, sans-serif; cursor:pointer; text-align:center; text-decoration:none; }
-  #build { flex:1 1 100%; background:var(--ink); color:var(--bg); }
-  #build:hover { opacity:.88; }
+  .chips button { flex:none; padding:4px 8px 4px 10px; border:0; border-radius:0; clip-path:var(--chamfer); background:var(--ink); color:var(--panel); font:700 12px/1.2 var(--font-head); letter-spacing:.02em; }
+  .chips button span { opacity:.6; margin-left:7px; font-weight:400; }
+  .chips button:hover span { opacity:1; }
+  .linkbtn { flex:1 1 100%; text-align:center; padding:2px 0 0; border:0; background:none; color:var(--muted); font:500 12px var(--font-body); text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
+  .linkbtn:hover { color:var(--ink); }
+  .actions { position:sticky; bottom:-16px; background:var(--panel); padding:10px 4px 6px; margin-left:-4px; margin-right:-4px; display:flex; flex-wrap:wrap; gap:8px; border-top:1px solid var(--line); margin-top:12px; }
+  button, a.btn { flex:1; padding:9px 12px; border-radius:8px; border:1px solid transparent; font:600 14px var(--font-body); cursor:pointer; text-align:center; text-decoration:none; }
+  /* The one main action on the page: Launch orange with Night text (5.2:1; white on orange fails). */
+  #build { flex:1 1 100%; background:var(--cta); color:var(--cta-ink); box-shadow:inset 0 -3px 0 rgba(18,32,58,.18); }
+  #build:hover { filter:brightness(1.05); }
   #build:disabled { opacity:.5; cursor:wait; }
-  a.btn { color:var(--ink); background:transparent; border-color:var(--line); }
-  a.btn:hover { border-color:var(--accent); color:var(--accent); }
+  a.btn { color:var(--ink); background:transparent; border-color:var(--line); font-size:13px; padding:8px 6px; }
+  a.btn:hover { background:var(--hover); }
   a.btn.off { pointer-events:none; opacity:.4; }
   #right { display:grid; grid-template-rows:minmax(0,1fr) auto; min-width:0; min-height:0; }
-  #view { position:relative; min-height:0; min-width:0; overflow:hidden; background:linear-gradient(var(--view-top),var(--view-bot));
+  /* A faint blueprint grid behind the model (the canvas is transparent). */
+  #view { position:relative; min-height:0; min-width:0; overflow:hidden; background:var(--grid) -1px -1px, linear-gradient(var(--view-top),var(--view-bot));
     -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
   #view canvas { position:absolute; inset:0; width:100% !important; height:100% !important; display:block; touch-action:none; }
-  .chip { background:var(--chip); border:1px solid var(--line); border-radius:6px; font-size:12px;
-    -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
-  #status { position:absolute; z-index:1; left:12px; top:10px; max-width:calc(100% - 250px); padding:4px 8px; color:var(--muted); }
-  #viewopts { position:absolute; z-index:1; right:12px; top:10px; display:flex; gap:12px; padding:4px 10px; }
-  #viewopts label { display:flex; margin:0; gap:5px; align-items:center; }
-  #tip { position:absolute; z-index:2; pointer-events:none; padding:4px 8px; color:var(--ink); white-space:nowrap; }
-  #tip b { font-weight:600; }
+  .chip { background:var(--chip); border-radius:8px; font-size:12px; -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
+  #status { position:absolute; z-index:1; left:12px; top:10px; max-width:calc(100% - 250px); padding:4px 9px; color:var(--muted); }
+  /* View options: one compact segmented group, as in Rocket Builder. The checkboxes stay (hidden) and drive it. */
+  #viewopts { position:absolute; z-index:1; right:12px; top:10px; display:flex; gap:2px; padding:3px; border-radius:10px; box-shadow:0 1px 3px rgba(18,32,58,.12); }
+  #viewopts label { position:relative; display:flex; align-items:center; margin:0; padding:4px 10px; min-height:26px; border-radius:7px;
+    font:600 12px var(--font-body); color:var(--muted); cursor:pointer; }
+  #viewopts label:hover { color:var(--ink); background:var(--hover); }
+  #viewopts input[type=checkbox] { position:absolute; opacity:0; width:1px; height:1px; margin:0; pointer-events:none; }
+  #viewopts label:has(input:checked) { color:var(--panel); background:var(--ink); }
+  #viewopts label:has(input:focus-visible) { outline:2px solid var(--accent); outline-offset:1px; }
+  #tip { position:absolute; z-index:2; pointer-events:none; padding:4px 8px; color:var(--ink); white-space:nowrap; box-shadow:0 1px 3px rgba(18,32,58,.12); }
+  #tip b { font-weight:600; font-family:var(--font-head); }
   #progress { position:absolute; z-index:2; left:0; right:0; top:0; height:3px; }
   #progress div { height:100%; width:0; background:var(--accent); transition:width .3s; }
-  #report { padding:10px 16px calc(10px + var(--safe-b)) 16px; padding-right:calc(16px + var(--safe-r)); background:var(--panel); border-top:1px solid var(--line);
+  #report { padding:12px 18px calc(12px + var(--safe-b)) 18px; padding-right:calc(18px + var(--safe-r)); background:var(--panel); border-top:1px solid var(--line);
     max-height:34vh; max-height:34dvh; overflow-y:auto; -webkit-overflow-scrolling:touch; display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); gap:6px 24px; }
   #report:empty { display:none; }
-  #report h2 { font-size:13px; margin:6px 0 4px; }
+  #report h2 { font:600 11.5px/1.4 var(--font-head); text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:8px 0 4px; }
+  h2, h3, h4 { font-family:var(--font-head); letter-spacing:-.005em; }
   table { border-collapse:collapse; width:100%; font-size:12.5px; }
   td, th { padding:3px 6px 3px 0; text-align:left; border-bottom:1px solid var(--rowline); }
   th { color:var(--muted); font-weight:600; }
   td.n, th.n { text-align:right; font-variant-numeric:tabular-nums; }
+  td.n { font-family:var(--font-head); }
   tr.hi td { background:var(--card); }
   .sw { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; vertical-align:-1px; }
   ul { margin:4px 0; padding-left:18px; }
-  .error { grid-column:1/-1; color:var(--err); background:var(--errbg); border:1px solid var(--errline); padding:8px 10px; border-radius:6px; }
+  .error { grid-column:1/-1; color:var(--err); background:var(--errbg); border:1px solid var(--errline); padding:8px 10px; border-radius:8px; }
   .warn { color:var(--warn); }
   .ok { color:var(--ok); }
   dl.guide { margin:4px 0; font-size:12.5px; }
   dl.guide dt { font-weight:600; } dl.guide dd { margin:0 0 4px; color:var(--muted); }
-  @media (max-width: 760px) {
-    body { height:auto; }
+  /* Phones and narrow windows: preview on top, then the form, then the report (as in Rocket Builder). */
+  @media (max-width: 800px) {
+    body { height:auto; min-height:100dvh; }
     main { display:flex; flex-direction:column; }
-    #form { border-right:none; overflow:visible; }
-    #right { order:-1; grid-template-rows:60vh auto; }
-    #report { max-height:none; grid-template-columns:1fr; }
-    #status { max-width:calc(100% - 24px); top:46px; }
+    #right { display:contents; }
+    #view { order:1; height:52vh; height:52svh; min-height:280px; max-height:620px; flex:none; border-bottom:1px solid var(--line); }
+    #form { order:2; overflow:visible; border-right:none; padding-left:calc(16px + var(--safe-l)); padding-right:calc(16px + var(--safe-r)); }
+    #report { order:3; grid-template-columns:1fr; max-height:none; overflow:visible; }
+    .actions { bottom:0; padding-bottom:calc(8px + var(--safe-b)); z-index:2; }
+    label { grid-template-columns:1fr 140px; }
+    #status { max-width:calc(100% - 24px); top:auto; bottom:10px; }
+    header nav .long { display:none; }
+  }
+  @media (max-width: 480px) {
+    header { gap:6px 12px; }
+    header .units { display:none; }
   }
 </style>
 <script>
@@ -142,7 +195,7 @@
 </script>
 </head>
 <body>
-<header><h1>Fit Test Builder</h1><nav><a href="https://quiverdesignworks.net/">← Quiver Design Works</a></nav><span class="units">Beta · units mm · clearances radial (per side)</span><button id="theme" type="button"></button></header>
+<header><h1><a href="./" title="Fit Test Builder: start page"><svg viewBox="0 0 64 64" aria-hidden="true" focusable="false"><path d="M8 30H21V49H43V30H56V51L51 56H13L8 51Z" fill="currentColor"/><path d="M18 14H46L50 18V24H39V42L36 45H28L25 42V24H14V18Z" fill="#F2652B"/></svg>Fit Test Builder</a><span class="betatag">Beta</span></h1><nav><a href="https://rocket.quiverdesignworks.net/" title="Design a model rocket and print it">Rocket Builder</a><a href="https://quiverdesignworks.net/#apps">← Quiver<span class="long"> Design Works</span></a></nav><span class="units">units mm · clearances radial (per side)</span><button id="theme" type="button"></button></header>
 <main>
   <form id="form" autocomplete="off" novalidate onsubmit="return false">
     <div class="seg modes" role="tablist" aria-label="Builder">
@@ -179,7 +232,7 @@
       <p class="hint">One socket per size. Separate several with commas, e.g. 13, 18, 24.</p>
     </fieldset>
     <fieldset id="jointclear">
-      <legend id="clegend">Clearance (radial, per side)</legend>
+      <legend><span id="clegend">Clearance (radial, per side)</span></legend>
       <div class="seg" role="group" aria-label="Clearance input">
         <button type="button" id="cmode-range" aria-pressed="true">Range</button>
         <button type="button" id="cmode-list" aria-pressed="false">List</button>
@@ -442,7 +495,7 @@ function problems(req) {
 }
 function showErrors(items, fieldIds = []) {
   document.querySelectorAll('[aria-invalid=true]').forEach(e => e.removeAttribute('aria-invalid'));
-  fieldIds.forEach(id => $(id)?.setAttribute('aria-invalid', 'true'));
+  fieldIds.forEach(id => { $(id)?.setAttribute('aria-invalid', 'true'); const fs = $(id)?.closest('fieldset.shut'); if (fs) setFold(fs, true); });
   const box = $('formerr');
   if (!items.length) { box.hidden = true; box.innerHTML = ''; return; }
   box.innerHTML = items.length === 1 ? esc(items[0]) : `Fix these, then press Build again:<ul>${items.map(m => `<li>${esc(m)}</li>`).join('')}</ul>`;
@@ -451,6 +504,23 @@ function showErrors(items, fieldIds = []) {
 document.querySelectorAll('#form input, #form select').forEach(e => e.addEventListener('input', () => {
   if (e.getAttribute('aria-invalid')) e.removeAttribute('aria-invalid');
 }));
+
+// ---------- sections fold (as in Rocket Builder's Advanced form): the heading is a button ----------
+// The legend's contents move into the button (#clegend's text is still set by refresh()). All start open.
+function setFold(fs, open) {
+  fs.classList.toggle('shut', !open);
+  fs.querySelector(':scope > legend > .fold')?.setAttribute('aria-expanded', String(open));
+}
+for (const fs of document.querySelectorAll('#form fieldset')) {
+  const lg = fs.querySelector(':scope > legend');
+  if (!lg) continue;
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'fold';
+  b.append(...lg.childNodes);
+  lg.append(b);
+  b.onclick = () => setFold(fs, fs.classList.contains('shut'));
+  setFold(fs, true);
+}
 
 // ---------- remember the inputs in this browser (per tab), and reset ----------
 const STORE = 'fit-test-builder:v3';  // v3: 3 thread caps by default
@@ -510,8 +580,9 @@ let framedSide = null, plateGroup = null, layoutModel = null, assembledModel = n
 
 // ---------- build plate: the plate, a 10 mm grid, the margin, and an origin marker ----------
 function plateColors() {
-  return isLight() ? { plate: 0xd9dbe1, grid: 0xb4b8c2, major: 0x9095a3, edge: 0x7d8290 }
-                   : { plate: 0x2a2c32, grid: 0x3a3d45, major: 0x4d515c, edge: 0x5d6270 };
+  // Brand tones: a Paper plate with a faint Sky blueprint grid in light, Night in dark.
+  return isLight() ? { plate: 0xf4eee2, grid: 0xd2dcec, major: 0xa5bde3, edge: 0x6e6e73 }
+                   : { plate: 0x263a5e, grid: 0x324a73, major: 0x4b6290, edge: 0x8a99b5 };
 }
 function makePlate(side, margin) {
   if (plateGroup) { scene.remove(plateGroup); plateGroup.traverse(o => { o.geometry?.dispose(); o.material?.dispose(); }); }

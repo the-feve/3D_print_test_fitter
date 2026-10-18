@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-labelledby="t">
+<title id="t">Fit Test Builder</title>
+<rect width="32" height="32" rx="7" fill="#12203A"/>
+<g transform="translate(16 16.5) scale(.5) translate(-32 -35)"><path d="M8 30H21V49H43V30H56V51L51 56H13L8 51Z" fill="#F6F1E7"/><path d="M18 14H46L50 18V24H39V42L36 45H28L25 42V24H14V18Z" fill="#F2652B"/></g>
+</svg>

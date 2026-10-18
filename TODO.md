@@ -37,7 +37,8 @@ Milestones are from `docs/spec.md`. Done items move to HANDOFF.md's log.
 - [x] `main` branch here (2026-10-17).
 - [x] Owner: `FIT_REPO_TOKEN`, rocket-builder-web PR #37, DNS, Fly cert. Live 2026-10-17 at fit.quiverdesignworks.net (unlisted).
 - [ ] Optional: redeploy rocket-builder-web automatically when this repo's `main` changes (`fit-updated` dispatch, like trebuchet_builder).
-- [ ] Links from quiverdesignworks.net and the builders' switcher (`nav.apps`) — only once the owner says it's ready.
+- [x] Public and linked from Rocket Builder and quiverdesignworks.net's Apps (owner, 2026-10-18); restyled in the Rocket Builder brand the same day.
+- [ ] Optional: link from Trebuchet Builder too, if the owner wants it.
 
 ## Milestone 5: later shapes
 - [ ] D-shaft, dovetail slide, press-fit pin, snap-fit hook, generic thread (pitch × clearance). (Hex, pentagon, octagon done 2026-10-17.)
