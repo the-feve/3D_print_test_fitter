@@ -1,10 +1,12 @@
 # Handoff
 
-_Last updated 2026-10-17 (two tabs, polygons, thread coupons)._
+_Last updated 2026-10-18 (Rocket Builder brand restyle; public and linked)._
 
 ## State
 
-Milestones 1 and 2 of `docs/spec.md` are done and run locally; nothing is deployed or linked yet (owner's call: link it from quiverdesignworks.net once it's dialled in, and keep it separate from the rocket / trebuchet sessions for now).
+Milestones 1 and 2 of `docs/spec.md` are done and live at https://fit.quiverdesignworks.net. **Public and linked since 2026-10-18 (owner):** from Rocket Builder (both modes) and quiverdesignworks.net's Apps; Rocket Builder dropped its noindex header for /fit and the page's robots meta is gone.
+
+- **Brand (2026-10-18, owner: restyle the rocket / trebuchet pages to the same brand):** the page uses Rocket Builder's tokens and look (rocket-builder-web `server/static/index.html`, `docs/brand/`): Paper / Night light and dark themes (`data-theme` + prefers-color-scheme), self-hosted Inter and Space Grotesk (`server/static/fonts/`, OFL licences beside them, relative `url(static/fonts/…)` so they load under /fit/ and at the fit host root), header with a peg-in-socket mark (Night socket in `currentColor`, orange peg with the chamfered insertion end), a chamfered **Beta** tag, links to Rocket Builder and ← Quiver Design Works. Orange only on Build; Rocket Builder / General and Range / List are segmented controls (Night pill); motor sizes are chamfered Night tags; Assembled / Section are a segmented group (the checkboxes are still there, visually hidden); blueprint grid behind the 3D view, Paper / Night plate colours; form sections fold (heading = button, all open at start; a folded section opens when one of its fields is flagged). `#clegend` is now a span inside its legend. Favicon `static/favicon.svg`, touch icon `static/apple-touch-icon.png`. Phone layout (≤ 800 px) as Rocket Builder: view, form, report.
 
 - **`fitgen/`** (build123d): round peg / hole, square peg / hole, and the tube shoulder / socket ported from rocket-builder-web `geometry/rocketgen/fit_test.py`. Clearance list (radial), engagement lengths (grid with clearances), sizes, wall, 45° insertion-end chamfer, seat (tube: countersink or flat), square corner radius, vent hole, orientation (flat face down or insertion end down), plate size. Labels recessed 0.6 mm into the bed face with the bundled FreeSans Bold. Layout packs rows centred on the plate inside an 8 mm margin and reports whether it fits. 3MF via `Mesher` (one named object per coupon) and one STL per coupon. CLI: `python -m fitgen`.
 - **`server/`** FastAPI + the page: form left, three.js view right (Rocket Builder's set-up, lights and theme tokens), build plate with 10 mm grid / margin / origin marker, coupons coloured by role (sockets grey, pegs blue → orange from tight to loose), hover or click for a coupon's name and clearance, Assembled and Section toggles, coupon table, plate usage, grams, judging guide, 3MF and STL ZIP downloads. Builds are cached in memory by a hash of the params plus `GENERATOR_VERSION`.
@@ -18,7 +20,7 @@ See `TODO.md`. In short: print the first plates and check them, then milestone 3
 
 ## Hosting setup (owner steps)
 
-Runs inside the existing Fly app `rocket-fevergeon`, the way Trebuchet Builder does, at **fit.quiverdesignworks.net**, no extra cost. Owner's choices (2026-10-16): Claude gets **no Fly or Cloudflare tokens** (the owner does the account steps; delete any Fly / Cloudflare tokens or variables added to the Claude environment while trying that); **unlisted** (noindex, no links), not admin-only.
+Runs inside the existing Fly app `rocket-fevergeon`, the way Trebuchet Builder does, at **fit.quiverdesignworks.net**, no extra cost. Owner's choices (2026-10-16): Claude gets **no Fly or Cloudflare tokens** (the owner does the account steps; delete any Fly / Cloudflare tokens or variables added to the Claude environment while trying that); **unlisted** (noindex, no links), not admin-only; made public and linked by the owner on 2026-10-18.
 
 **Status (2026-10-17): live at https://fit.quiverdesignworks.net** (also https://rocket-fevergeon.fly.dev/fit/ and https://rocket.quiverdesignworks.net/fit/). All owner steps done: `FIT_REPO_TOKEN` saved, rocket-builder-web PR #37 merged and deployed, Cloudflare CNAME `fit` → `rocket-fevergeon.fly.dev` (DNS only), Fly certificate issued (expires 2027-01-15, renews itself). Checked from a cloud session: page, a build (2.7 s warm), plate GLB, 3MF, STL ZIP, three.js, `X-Robots-Tag: noindex`. **Updating the live site:** push to this repo's `main`, then run rocket-builder-web's *Deploy to Fly.io* workflow by hand (or add a `ROCKET_DEPLOY_TOKEN` secret here and a workflow that sends the `fit-updated` dispatch, as trebuchet_builder does). The steps below are kept for reference.
 
@@ -45,9 +47,11 @@ Don't link it from quiverdesignworks.net or the builders until the owner says so
 - **Tube port:** same profile as the rocket (`shoulder_foot`, 45° rise, 5 mm band, 1.6 mm closed end, 45° inner step), but generic: size = bore, wall = tube wall, shoulder length = engagement length. The socket's label is now recessed into the bottom of a 2 mm tab (was raised on the rocket's flag).
 - **3MF read-back test parses the XML** (`Mesher().read` took ~50 s for 6 objects).
 - **Clearance codes** are hundredths of a mm with one decimal when needed (0.175 → C17.5); two clearances with the same code are rejected.
-- **Hosting (2026-10-16): mounted in Rocket Builder's Fly app `rocket-fevergeon`**, like Trebuchet Builder, at zero extra cost. rocket-builder-web `server/fit_mount.py` loads `server/app.py` from a `fittest/` checkout and mounts it at `/fit/`; `HostRouter` sends `fit.*` hosts there. It is unlisted: Rocket Builder adds `X-Robots-Tag: noindex` to every response (and the page has a robots meta tag); `ROCKETGEN_FIT=admin` restricts it to admin accounts (`ROCKETGEN_ADMIN_EMAILS`). Rocket Builder also swaps in its build lock so a rocket and a coupon set never build at once on the 1 GB machine (this app's `_turn()` reads `_lock` at call time for that). So the page's URLs are relative (`api/…`, `static/…`). New builds are rate-limited per address (`FITGEN_BUILDS_PER_10_MIN`, 30) and wait at most `FITGEN_BUILD_WAIT_S` (60 s) for the lock. Owner steps: Hosting setup above.
+- **Hosting (2026-10-16): mounted in Rocket Builder's Fly app `rocket-fevergeon`**, like Trebuchet Builder, at zero extra cost. rocket-builder-web `server/fit_mount.py` loads `server/app.py` from a `fittest/` checkout and mounts it at `/fit/`; `HostRouter` sends `fit.*` hosts there. It was unlisted until 2026-10-18 (noindex header and robots meta; both gone now that it is public); `ROCKETGEN_FIT=admin` restricts it to admin accounts (`ROCKETGEN_ADMIN_EMAILS`). Rocket Builder also swaps in its build lock so a rocket and a coupon set never build at once on the 1 GB machine (this app's `_turn()` reads `_lock` at call time for that). So the page's URLs are relative (`api/…`, `static/…`). New builds are rate-limited per address (`FITGEN_BUILDS_PER_10_MIN`, 30) and wait at most `FITGEN_BUILD_WAIT_S` (60 s) for the lock. Owner steps: Hosting setup above.
 
 ## Gotchas
+
+- **Fold chevrons poke out from under the sticky actions bar** unless the bar overhangs the form padding (`.actions` has 4 px negative side margins for that).
 
 - **Hosted builds slow down badly after a few (2026-10-17, cause not confirmed).** Reproduced right after a restart: the first rocket set (M24) 44 s, the next one (M29) over 5 minutes until the proxy dropped it, and `/healthz` unanswered meanwhile. Locally the same sets take ~25 s every time. On the Fly machine the first rocket sets took ~46–50 s (about 2× local), then a new M24 set ran for over 5 minutes on an idle machine and `/healthz` stopped answering for minutes, Rocket Builder included. Most likely Fly's CPU quota on shared CPUs (full speed only in bursts, then throttled); possibly memory on the 1 GB machine. Check the app's CPU / throttling graphs on the Fly dashboard. Mitigations so far: cached sets and plates answer without the build lock, preview meshes are tessellated once per coupon and reused, cache cut to 16 sets. A client that gives up doesn't stop its build: it keeps the lock until it finishes.
 
@@ -60,6 +64,8 @@ Don't link it from quiverdesignworks.net or the builders until the owner says so
 - Tests in a Claude cloud container: `pip install -e ".[server,test]"` into a venv (build123d isn't preinstalled). For screenshots use Playwright with `executable_path` set to the preinstalled Chromium under `/opt/pw-browsers/` and `--use-gl=swiftshader`.
 
 ## Log
+
+- 2026-10-18: restyled in the Rocket Builder brand (fonts, favicon, mark, Beta tag, segmented controls, folding sections, blueprint grid); public and linked (owner); robots meta removed.
 
 - 2026-10-17: Rocket Builder / General tabs, polygons, motor-thread coupons, saved inputs and field errors. Fixed the import map (the page didn't load three.js under /fit/ or fit.*).
 - 2026-10-17: live at fit.quiverdesignworks.net (unlisted).

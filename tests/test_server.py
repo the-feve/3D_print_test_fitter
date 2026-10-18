@@ -64,6 +64,12 @@ def test_page_works_under_a_prefix():
     assert imports and all(v.startswith("./") for v in imports.values()), imports
     assert c.get("/fit/static/vendor/three/build/three.module.js").status_code == 200
     assert "shapes" in c.get("/fit/api/options").json()
+    # Brand fonts and icons (relative URLs; CSS url() resolves against the page).
+    assert "url(/static/" not in page and 'href="/static/' not in page
+    for path in ["static/fonts/inter.woff2", "static/fonts/space-grotesk.woff2", "static/favicon.svg",
+                 "static/apple-touch-icon.png"]:
+        assert path in page and c.get(f"/fit/{path}").status_code == 200, path
+    assert 'name="robots"' not in page  # public and linked since 2026-10-18
 
 
 def test_new_builds_are_rate_limited(monkeypatch):
