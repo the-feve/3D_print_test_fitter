@@ -36,6 +36,11 @@ def test_build_previews_and_downloads():
     assert m.status_code == 200 and zipfile.ZipFile(io.BytesIO(m.content)).read("3D/3dmodel.model").count(b'name="D8_') == 3
     z = zipfile.ZipFile(io.BytesIO(client.get(f"/api/builds/{bid}/stl.zip").content))
     assert sorted(z.namelist()) == ["D8_L6_C10.stl", "D8_L6_C20.stl", "D8_socket.stl", "fit_test.json"]
+    s = client.get(f"/api/builds/{bid}/step.zip")
+    assert 'filename="fit_test_round_step.zip"' in s.headers["content-disposition"]
+    zs = zipfile.ZipFile(io.BytesIO(s.content))
+    assert sorted(zs.namelist()) == ["D8_L6_C10.step", "D8_L6_C20.step", "D8_socket.step", "fit_test.json"]
+    assert zs.read("D8_socket.step").startswith(b"ISO-10303-21;")
 
 
 def test_bad_request_is_explained():
@@ -99,7 +104,7 @@ def test_general_polygon_build_and_messages():
 
 
 def test_plate_combines_one_motor_builds():
-    base = {"mode": "rocket", "joints": ["body"], "clearances": [0.15], "thread_clearances": [0.25], "label_motor": True}
+    base = {"mode": "rocket", "joints": ["body"], "clearances": [0.15], "thread_clearances": [0.25]}
     a = client.post("/api/build", json={**base, "motors": ["M13"]}).json()["id"]
     b = client.post("/api/build", json={**base, "motors": ["M18"]}).json()["id"]
     r = client.post("/api/plate", json={"ids": [a, b]})
@@ -119,7 +124,7 @@ def test_plate_combines_one_motor_builds():
 
 def test_cached_builds_and_plates_answer_while_the_lock_is_held():
     import server.app as srv
-    base = {"mode": "rocket", "joints": ["body"], "clearances": [0.2], "thread_clearances": [0.25], "label_motor": True}
+    base = {"mode": "rocket", "joints": ["body"], "clearances": [0.2], "thread_clearances": [0.25]}
     a = client.post("/api/build", json={**base, "motors": ["M13"]}).json()["id"]
     b = client.post("/api/build", json={**base, "motors": ["M18"]}).json()["id"]
     old = srv.BUILD_WAIT_S

@@ -115,9 +115,11 @@ def _boss(t: dict) -> Solid:
     return one_solid(boss.fuse(_intersect(ridge, band)), "thread boss")
 
 
-def _cap(t: dict, lines: list[str]) -> Solid:
+def _cap(t: dict, lines: list[str], ribs: bool = False) -> Solid:
     """Rocket Builder's cap with a solid floor and the label recessed into its
-    bottom face, in assembled position."""
+    bottom face, in assembled position. The grip ribs are off by default: they
+    don't change the fit, and a test cap is small enough to turn without them
+    (they cost about a fifth of the cap's build time on the server)."""
     z_bottom = t["z_face"] - t["cap_face_t"]
     cup = revolve([
         (0.0, z_bottom),
@@ -139,8 +141,18 @@ def _cap(t: dict, lines: list[str]) -> Solid:
         (t["r_cap_in"], t["cap_top"]),
         (r_in, t["cap_top"] - (t["r_cap_in"] - r_in)),
     ])
-    cap = cup.fuse(_intersect(ridge, band))
+    cap = one_solid(cup.fuse(_intersect(ridge, band)), "motor cap")
+    if ribs:
+        cap = _add_ribs(cap, t, z_bottom)
+    # The label goes in last. Cut into the plain cup first, it made the
+    # thread union four times slower (each boolean pays for the text's faces).
+    fit = labels.fit_circle(lines, t["r_cap_in"] - 0.5)
+    if fit is None:
+        raise GeometryError("The motor cap is too small for a label.")
+    return cap.cut(labels.cutter(fit[0], fit[1], z_bottom, up=False)).clean()
 
+
+def _add_ribs(cap: Solid, t: dict, z_bottom: float) -> Solid:
     # Grip ribs: half-cylinders standing rib_out proud, both ends cut back
     # along the base and top chamfer cones so the chamfers stay visible.
     rib_c = t["r_cap_out"] + t["rib_out"] - t["rib_r"]
@@ -163,13 +175,7 @@ def _cap(t: dict, lines: list[str]) -> Solid:
     top_z0 = t["cap_top"] + top_slope * 1 - eps
     top_cut = revolve([(top_r0, top_z0), (cone_r1, top_z0), (cone_r1, top_z0 - top_slope * (cone_r1 - top_r0))])
     ribs = ribs.cut(base_cut).cut(top_cut)
-    cap = one_solid(cap.fuse(ribs), "motor cap")
-    # The label goes in last. Cut into the plain cup first, it made the
-    # thread union four times slower (each boolean pays for the text's faces).
-    fit = labels.fit_circle(lines, t["r_cap_in"] - 0.5)
-    if fit is None:
-        raise GeometryError("The motor cap is too small for a label.")
-    return cap.cut(labels.cutter(fit[0], fit[1], z_bottom, up=False)).clean()
+    return one_solid(cap.fuse(ribs), "motor cap")
 
 
 def _to_boss_print(s: Solid) -> Solid:

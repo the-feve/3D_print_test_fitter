@@ -69,7 +69,6 @@ class FitParams:
     orientation: str = "flat"  # "flat" (closed end / head on the bed) or "functional" (insertion end down)
     vent: bool = True  # vent hole in a blind socket's floor
     plate: float = 256.0  # build plate side, mm
-    label_size: bool = False  # always add the size line to peg labels (several rocket motors on one plate)
 
     @classmethod
     def for_shape(cls, shape: str, **kw) -> "FitParams":
@@ -203,7 +202,7 @@ def _peg_lines(p: FitParams, size: float, L: float, c: float) -> list[str]:
     lines = [f"C{code(c)}"]
     if len(p.lengths) > 1:
         lines.append(f"L{num(L)}")
-    if len(p.sizes) > 1 or p.label_size:
+    if len(p.sizes) > 1:
         lines.append(f"{_tag(p, size)}")
     return lines
 

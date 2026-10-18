@@ -100,7 +100,6 @@ class RocketParams:
     joints: tuple[str, ...] = ("body",)
     clearances: tuple[float, ...] = DEFAULT_CLEARANCES  # joint clearances, radial
     thread: bool = True
-    label_motor: bool = False  # add the size line to labels even for one motor (it joins others on a plate)
     thread_clearances: tuple[float, ...] = DEFAULT_THREAD_CLEARANCES  # radial, crest to cap bore
     chamfer: float = 0.5
     seat: str = "countersink"
@@ -114,16 +113,11 @@ class RocketParams:
         d["mode"] = "rocket"
         return d
 
-    def many(self) -> bool:
-        """Labels carry the size: several motors on this plate, or this set
-        will join others (the page builds one motor at a time)."""
-        return len(self.motors) > 1 or self.label_motor
-
     def joint_params(self, motor: str) -> FitParams | None:
         if not self.joints:
             return None
         return params(motor, self.wall, self.offset, self.joints, clearances=self.clearances, chamfer=self.chamfer,
-                      seat=self.seat, orientation=self.orientation, plate=self.plate, label_size=self.many())
+                      seat=self.seat, orientation=self.orientation, plate=self.plate, )
 
 
 MAX_MOTORS = 2  # per build request: a default M18 set takes ~46 s on the Fly machine. The page builds
@@ -183,7 +177,10 @@ def build(p: RocketParams) -> tuple[list[Coupon], list[str]]:
                               thread.boss_coupon(mtr_d, d["bay_id"], d["wall"], m, _flag), label=[m]))
             for c in p.thread_clearances:
                 name = f"{m}_T{code(c)}"
-                lines = [f"T{code(c)}"] + ([m] if p.many() else [])
+                # One line, even with several motors on the plate: an M13 cap
+                # can't be mistaken for an M24 one, and every extra line of text
+                # costs build time (labels are the slowest boolean on a coupon).
+                lines = [f"T{code(c)}"]
                 # The cap always prints face down (as on Rocket Builder): its
                 # thread's 45-degree flanks need that way up.
                 printed, seated = thread.cap_coupon(mtr_d, d["bay_id"], d["wall"], c, lines, name)

@@ -14,7 +14,8 @@ Milestones are from `docs/spec.md`. Done items move to HANDOFF.md's log.
 
 ## Hosting: builds are too heavy for the shared-CPU machine (owner decides)
 - [ ] Owner: check `rocket-fevergeon` → Metrics → CPU (throttling) on the Fly dashboard after a couple of builds.
-- [ ] Zero-cost fix: keep each built set on the `/data` volume (report + per-coupon meshes; 3MF / STL from the meshes, no OpenCascade), prebuild the default sets per motor, so most builds never run OpenCascade on the server. Cheaper caps (no grip ribs) too.
+- [x] Lighter builds: caps without grip ribs, one-line Rocket labels (default M18 set 29 s → 15 s locally), one size per request (2026-10-18).
+- [ ] If hosted builds still crawl: keep each built set on the `/data` volume and prebuild the default sets per motor. build123d solids don't pickle (`BRepTools_History`); store BREP text per coupon (`export_brep` / `import_brep`) or the preview meshes and make 3MF / STL from them.
 - [ ] Or run Fit Test Builder on its own small Fly machine (costs a few dollars a month) so it can't slow Rocket Builder.
 
 ## Rocket Builder tab

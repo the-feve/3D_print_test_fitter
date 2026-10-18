@@ -29,7 +29,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from fitgen import GENERATOR_VERSION, SHAPES, FitParams, GeometryError, build, layout, rocket, stl_zip, write_3mf
+from fitgen import GENERATOR_VERSION, SHAPES, FitParams, GeometryError, build, layout, rocket, step_zip, stl_zip, write_3mf
 from fitgen.coupons import CORNERED, DEFAULT_CLEARANCES, DEFAULT_LENGTHS, DEFAULT_SIZES, DEFAULT_WALL, SIDES, code
 from fitgen.plate import MARGIN
 
@@ -99,7 +99,6 @@ class BuildRequest(BaseModel):
     # rocket mode
     motor: str = "M18"  # one motor (older requests); `motors` wins when given
     motors: list[str] = Field(default_factory=list, max_length=5)  # fitgen allows 2 per request (rocket.MAX_MOTORS)
-    label_motor: bool = False  # the page builds one motor at a time for a plate of several: label the size
     body_offset: float = 0.0
     joints: list[Literal["body", "nose"]] = Field(default_factory=lambda: ["body"], max_length=2)
     thread: bool = True
@@ -113,8 +112,8 @@ class BuildRequest(BaseModel):
             return rocket.RocketParams(motors=tuple(self.motors or [self.motor]), wall=self.wall, offset=self.body_offset,
                                        joints=tuple(self.joints), clearances=d["clearances"], thread=self.thread,
                                        thread_clearances=d["thread_clearances"], chamfer=self.chamfer, seat=self.seat,
-                                       orientation=self.orientation, plate=self.plate, label_motor=self.label_motor)
-        for k in ("mode", "motor", "motors", "label_motor", "body_offset", "joints", "thread", "thread_clearances"):
+                                       orientation=self.orientation, plate=self.plate)
+        for k in ("mode", "motor", "motors", "body_offset", "joints", "thread", "thread_clearances"):
             d.pop(k)
         return FitParams(**d)
 
@@ -267,7 +266,7 @@ def build_set(req: BuildRequest, request: Request):
 def _store(key: str, p, items, notes: list[str], plate) -> None:
     flat, assembled = _glbs(plate)
     _builds[key] = {"p": p, "notes": notes, "plate": plate, "items": items, "report": _report(p, plate, notes),
-                    "plate_glb": flat, "assembled_glb": assembled, "3mf": None, "zip": None}
+                    "plate_glb": flat, "assembled_glb": assembled, "3mf": None, "zip": None, "step": None}
     while len(_builds) > CACHE_SIZE:
         _builds.popitem(last=False)
 
@@ -304,7 +303,7 @@ def combine(req: PlateRequest):
                                               f"{rocket.MAX_PEGS} and {rocket.MAX_CAPS} (fewer sizes or clearances)."},
                                     status_code=422)
             motors = tuple(m for q in ps for m in q.motors)
-            p = replace(ps[0], motors=motors, label_motor=True, plate=req.plate)
+            p = replace(ps[0], motors=motors, plate=req.plate)
             notes = list(dict.fromkeys(n for b in parts for n in b["notes"]))
             _store(key, p, items, notes, layout(items, req.plate))
         _builds.move_to_end(key)
@@ -347,3 +346,15 @@ def download_zip(build_id: str):
             b["zip"] = stl_zip(b["items"], extra)
     return Response(b["zip"], media_type="application/zip",
                     headers={"Content-Disposition": f'attachment; filename="{_name(b)}_stl.zip"'})
+
+
+
+@app.get("/api/builds/{build_id}/step.zip")
+def download_step(build_id: str):
+    """One STEP per coupon, as printed: for editing or slicing from CAD."""
+    b = _get(build_id)
+    with _turn():
+        if b.get("step") is None:
+            b["step"] = step_zip(b["items"], {"fit_test.json": json.dumps(b["report"], indent=2).encode()})
+    return Response(b["step"], media_type="application/zip",
+                    headers={"Content-Disposition": f'attachment; filename="{_name(b)}_step.zip"'})

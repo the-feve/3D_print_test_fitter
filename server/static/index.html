@@ -229,6 +229,7 @@
       <button id="build" type="submit">Build</button>
       <a id="dl3mf" class="btn off" href="#" download>3MF plate</a>
       <a id="dlzip" class="btn off" href="#" download>STLs (ZIP)</a>
+      <a id="dlstep" class="btn off" href="#" download title="One STEP file per coupon, for CAD">STEP (ZIP)</a>
       <button type="button" id="reset" class="linkbtn">Reset this tab to defaults</button>
     </div>
   </form>
@@ -755,8 +756,8 @@ async function show(body, done = true) {
   if (framedSide !== report.plate.side) { frame(report.plate.side); framedSide = report.plate.side; }  // keep the user's view otherwise
   applyView();
   renderReport(report);
-  $('dl3mf').href = `api/builds/${buildId}/fit_test.3mf`; $('dlzip').href = `api/builds/${buildId}/stl.zip`;
-  ['dl3mf', 'dlzip'].forEach(id => $(id).classList.toggle('off', !done));
+  $('dl3mf').href = `api/builds/${buildId}/fit_test.3mf`; $('dlzip').href = `api/builds/${buildId}/stl.zip`; $('dlstep').href = `api/builds/${buildId}/step.zip`;
+  ['dl3mf', 'dlzip', 'dlstep'].forEach(id => $(id).classList.toggle('off', !done));
 }
 const coupons = req => req.mode === 'rocket'
   ? req.joints.length * req.clearances.length + (req.joints.length ? 1 : 0) + (req.thread ? 1 + req.thread_clearances.length : 0)
@@ -773,7 +774,7 @@ $('form').onsubmit = async ev => {
   if (found.length) { showErrors(found.map(p => p.msg), found.map(p => p.id)); setStatus('Check the highlighted fields.'); return; }
   showErrors([]); save();
   const btn = $('build'); btn.disabled = true;
-  ['dl3mf', 'dlzip'].forEach(id => $(id).classList.add('off'));
+  ['dl3mf', 'dlzip', 'dlstep'].forEach(id => $(id).classList.add('off'));
   let built = [];
   try {
     if (req.mode === 'rocket' && req.motors.length > 1) {
@@ -786,7 +787,7 @@ $('form').onsubmit = async ev => {
       }
       const todo = req.motors.filter(m => !skip.has(m));
       for (const [i, m] of todo.entries()) {
-        const one = { ...req, motors: [m], label_motor: true };
+        const one = { ...req, motors: [m] };
         setStatus(`Building ${m} (${i + 1} of ${todo.length}): ${coupons(one)} coupons…`); progressStart(estimate(one));
         let b;
         try { b = await post('api/build', one); }

@@ -1,4 +1,4 @@
-"""Lay coupons out on the build plate and write the 3MF and STLs."""
+"""Lay coupons out on the build plate and write the 3MF, STLs and STEPs."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from build123d import Mesher, export_stl
+from build123d import Mesher, export_step, export_stl
 
 from .coupons import Coupon
 
@@ -87,6 +87,25 @@ def stl_bytes(coupon: Coupon) -> bytes:
         p = Path(tmp) / "c.stl"
         export_stl(coupon.print_solid, p, tolerance=0.01, angular_tolerance=0.1)
         return p.read_bytes()
+
+
+def step_bytes(coupon: Coupon) -> bytes:
+    """The coupon as printed (resting on z = 0), as STEP: exact geometry for
+    editing or re-meshing in CAD."""
+    with tempfile.TemporaryDirectory() as tmp:
+        p = Path(tmp) / "c.step"
+        export_step(coupon.print_solid, p)
+        return p.read_bytes()
+
+
+def step_zip(items: list[Coupon], extra: dict[str, bytes] | None = None) -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for c in items:
+            z.writestr(f"{c.name}.step", step_bytes(c))
+        for name, data in (extra or {}).items():
+            z.writestr(name, data)
+    return buf.getvalue()
 
 
 def write_stls(items: list[Coupon], folder: Path) -> list[Path]:

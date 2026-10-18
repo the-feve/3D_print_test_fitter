@@ -92,12 +92,6 @@ def test_several_motor_sizes_on_one_plate():
     _, notes = build(RocketParams(motors=("M24", "M24L"), joints=(), thread_clearances=(0.25,)))
     assert any("M24L has the same joints and thread as M24" in n for n in notes)
     labels = {c.name: c.label for c in items}
-    assert labels["D13.4_L10_C15"] == ["C15", "D13.4"] and labels["M24_T25"] == ["T25", "M24"]
+    # One line each: the sizes can't be mixed up, and text is the slowest part to build.
+    assert labels["D13.4_L10_C15"] == ["C15"] and labels["M24_T25"] == ["T25"]
     assert layout(items, 256.0).fits
-
-
-def test_one_motor_labelled_to_join_a_plate():
-    items, _ = build(RocketParams(motors=("M13",), joints=("body",), clearances=(0.15,), thread_clearances=(0.25,),
-                                  label_motor=True))
-    labels = {c.name: c.label for c in items}
-    assert labels["D13.4_L10_C15"] == ["C15", "D13.4"] and labels["M13_T25"] == ["T25", "M13"]
