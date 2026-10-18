@@ -19,7 +19,8 @@ Milestones are from `docs/spec.md`. Done items move to HANDOFF.md's log.
 - [ ] Or run Fit Test Builder on its own small Fly machine (costs a few dollars a month) so it can't slow Rocket Builder.
 
 ## Rocket Builder tab
-- [ ] Rocket Builder Advanced *Fits and joints* inputs (joint clearance, joint lengths, thread clearance / pitch / turns): built 2026-10-17 in rocket-builder-web (PR, not merged). Once merged, this tab could offer the same overrides so a coupon matches a customised rocket.
+- [x] Rocket Builder Advanced *Fits and joints* inputs, STEP download and the "Generate test fit parts" link: live 2026-10-18 (rocket-builder-web PR #38).
+- [ ] Optional: offer the same fit overrides here (joint length, thread pitch / turns) so a coupon matches a customised rocket; the link could pass them too.
 - [ ] Optional: motor-in-bay coupons (rings at a few clearances to try a real motor in; Rocket Builder uses 0.2 mm, `mtr_clear`).
 - [ ] Optional: print the thread boss tail-down like the real aft (now flange down).
 
